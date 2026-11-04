@@ -8,7 +8,7 @@ import InputField from "@/components/Input";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
 import { setAuthToken } from "@/lib/auth";
-import { emailRegex, passwordRegex } from "@/utils";
+import { emailRegex } from "@/utils";
 
 type LoginFormValues = {
   email: string;
@@ -96,11 +96,6 @@ export default function LoginPage() {
           errors={errors}
           rules={{
             required: "Password is required.",
-            pattern: {
-              value: passwordRegex,
-              message:
-                "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a special character.",
-            },
           }}
           startAdornment={<i className="bi bi-lock text-secondary" aria-hidden="true" />}
           endAdornment={
