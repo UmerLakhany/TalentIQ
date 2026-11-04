@@ -66,6 +66,7 @@ const InputField: FC<InputFieldProps> = (props) => {
     <Fragment>
       {label && (
         <label
+          htmlFor={id}
           className="form-label"
           style={{ fontWeight: 500, ...labelStyle }}
         >

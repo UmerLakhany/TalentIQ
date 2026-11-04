@@ -430,3 +430,35 @@ body {
     transform: none;
   }
 }
+
+/* ---------- Auth pages (login, forgot password) ---------- */
+.hf-auth-aside {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, var(--hf-primary) 0%, #3730a3 55%, #1e1b4b 100%);
+}
+
+/* Soft decorative glow behind the brand panel content */
+.hf-auth-aside::before {
+  content: "";
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  right: -160px;
+  top: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
+}
+
+.hf-auth-aside > * {
+  position: relative;
+}
+
+.hf-auth-aside-body {
+  max-width: 460px;
+}
+
+.hf-auth-card {
+  max-width: 420px;
+}

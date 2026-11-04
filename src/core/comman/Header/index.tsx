@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { route } from "@/constants/routes";
+import { clearAuthToken } from "@/lib/auth";
 import { buildBreadcrumbs } from "@/utils/breadcrumbs";
 
 interface HeaderProps {
@@ -15,6 +17,12 @@ export default function Header({ onToggleSidebar, onOpenMobileSidebar }: HeaderP
   const pathname = usePathname();
   const crumbs = buildBreadcrumbs(pathname);
   const pageTitle = crumbs[crumbs.length - 1]?.label ?? "Jobs";
+
+  const logout = () => {
+    clearAuthToken();
+    // Full page load so no cached private pages remain in the client router
+    window.location.replace(route.login);
+  };
 
   return (
     <header className="sticky-top bg-white border-bottom">
@@ -59,6 +67,17 @@ export default function Header({ onToggleSidebar, onOpenMobileSidebar }: HeaderP
             </nav>
           )}
         </div>
+
+        <button
+          type="button"
+          className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 rounded-3 flex-shrink-0"
+          onClick={logout}
+          aria-label="Log out"
+          title="Log out"
+        >
+          <i className="bi bi-box-arrow-right" aria-hidden="true" />
+          <span className="d-none d-sm-inline">Log out</span>
+        </button>
       </div>
     </header>
   );

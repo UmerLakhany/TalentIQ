@@ -1,6 +1,8 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
+import { isAuthRoute } from "@/constants/routes";
 import Footer from "@/core/comman/Footer";
 import Header from "@/core/comman/Header";
 import Sidebar from "@/core/comman/Sidebar";
@@ -8,6 +10,7 @@ import Sidebar from "@/core/comman/Sidebar";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   // While the mobile drawer is open: lock page scroll, close on Escape,
   // and close automatically if the screen grows to desktop size.
@@ -31,6 +34,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       desktop.removeEventListener("change", onBreakpointChange);
     };
   }, [mobileOpen]);
+
+  // Login / forgot password render full-screen, without sidebar and header
+  if (isAuthRoute(pathname)) return <>{children}</>;
 
   return (
     <div className="min-vh-100">
