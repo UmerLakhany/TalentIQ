@@ -34,6 +34,18 @@ export const SuccessToaster = (message: string): void => {
   });
 };
 
+export const InfoToaster = (message: string): void => {
+  toast.info(message, {
+    position: "top-center",
+    autoClose: 3000,
+    hideProgressBar: true,
+    closeOnClick: false,
+    pauseOnHover: false,
+    draggable: false,
+    progress: undefined,
+  });
+};
+
 export const ErrorToaster = (message: string): void => {
   toast.error(message, {
     position: "top-center",

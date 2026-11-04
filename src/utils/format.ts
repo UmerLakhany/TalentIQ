@@ -32,6 +32,14 @@ export function formatDate(isoDate: string): string {
   return dateFormatter.format(new Date(isoDate));
 }
 
+const AVATAR_TONES = ["primary", "success", "info", "warning", "danger", "secondary"];
+
+/** Stable avatar colour per name (Bootstrap colour name) */
+export function getAvatarTone(name: string): string {
+  const hash = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return AVATAR_TONES[hash % AVATAR_TONES.length];
+}
+
 /** "Sarah Mitchell" -> "SM" */
 export function getInitials(name: string): string {
   return name

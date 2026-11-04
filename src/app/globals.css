@@ -79,7 +79,30 @@ body {
   --bs-btn-active-border-color: #3730a3;
 }
 
-.form-control:focus {
+.btn-outline-primary {
+  --bs-btn-color: var(--hf-primary);
+  --bs-btn-border-color: #c7d2fe;
+  --bs-btn-hover-color: var(--hf-primary-hover);
+  --bs-btn-hover-bg: var(--hf-primary-soft);
+  --bs-btn-hover-border-color: #c7d2fe;
+  --bs-btn-active-color: #3730a3;
+  --bs-btn-active-bg: var(--hf-primary-soft);
+  --bs-btn-active-border-color: var(--hf-primary);
+}
+
+.pagination {
+  --bs-pagination-color: var(--hf-text-body);
+  --bs-pagination-hover-color: var(--hf-primary);
+  --bs-pagination-hover-bg: var(--hf-primary-soft);
+  --bs-pagination-focus-color: var(--hf-primary);
+  --bs-pagination-focus-box-shadow: 0 0 0 0.2rem rgba(var(--hf-primary-rgb), 0.15);
+  --bs-pagination-active-bg: var(--hf-primary);
+  --bs-pagination-active-border-color: var(--hf-primary);
+  --bs-pagination-border-color: var(--hf-border);
+}
+
+.form-control:focus,
+.form-select:focus {
   border-color: #a5b4fc;
   box-shadow: 0 0 0 0.2rem rgba(var(--hf-primary-rgb), 0.15);
 }
@@ -125,6 +148,34 @@ body {
 .hf-empty-icon {
   width: 56px;
   height: 56px;
+}
+
+.hf-stat-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Match score bar */
+.hf-score {
+  min-width: 120px;
+}
+
+.hf-score-bar {
+  height: 6px;
+}
+
+/* Sortable table heading button — looks like the heading text */
+.hf-sort-btn {
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.hf-sort-btn:hover {
+  color: var(--hf-primary);
 }
 
 .min-w-0 {
