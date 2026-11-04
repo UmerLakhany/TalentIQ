@@ -6,3 +6,286 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* ==========================================================================
+   HireFlow AI — Light theme
+   Bootstrap classes do the styling; these variables recolour Bootstrap.
+   Custom classes (prefixed `hf-`) exist only where Bootstrap has no option.
+   ========================================================================== */
+:root,
+[data-bs-theme="light"] {
+  --hf-primary: #4f46e5;
+  --hf-primary-rgb: 79, 70, 229;
+  --hf-primary-hover: #4338ca;
+  --hf-primary-soft: #eef2ff;
+  --hf-bg: #f8fafc;
+  --hf-hover: #f1f5f9;
+  --hf-text: #0f172a;
+  --hf-text-body: #334155;
+  --hf-text-muted: #64748b;
+  --hf-border: #e2e8f0;
+
+  --hf-sidebar-width: 260px;
+  --hf-sidebar-collapsed-width: 80px;
+  --hf-header-height: 64px;
+
+  /* Bootstrap overrides */
+  --bs-primary: var(--hf-primary);
+  --bs-primary-rgb: var(--hf-primary-rgb);
+  --bs-primary-bg-subtle: var(--hf-primary-soft);
+  --bs-primary-text-emphasis: #3730a3;
+  --bs-body-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-body-font-size: 0.875rem;
+  --bs-body-bg: var(--hf-bg);
+  --bs-body-color: var(--hf-text-body);
+  --bs-emphasis-color: var(--hf-text);
+  --bs-secondary-color: var(--hf-text-muted);
+  --bs-tertiary-bg: var(--hf-hover);
+  --bs-border-color: var(--hf-border);
+  --bs-border-radius: 10px;
+  --bs-border-radius-lg: 12px;
+  --bs-link-color: var(--hf-primary);
+  --bs-link-color-rgb: var(--hf-primary-rgb);
+  --bs-link-hover-color: var(--hf-primary-hover);
+}
+
+body {
+  background-color: var(--hf-bg);
+  overflow-x: hidden;
+}
+
+/* Keeps page content readable on very wide screens */
+.hf-page {
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+}
+
+/* iOS zooms into inputs smaller than 16px — use 16px on phones & tablets */
+@media (max-width: 767.98px) {
+  .form-control,
+  .form-select {
+    font-size: 1rem;
+  }
+}
+
+/* Bootstrap components compile their colours, so primary needs re-pointing */
+.btn-primary {
+  --bs-btn-bg: var(--hf-primary);
+  --bs-btn-border-color: var(--hf-primary);
+  --bs-btn-hover-bg: var(--hf-primary-hover);
+  --bs-btn-hover-border-color: var(--hf-primary-hover);
+  --bs-btn-active-bg: #3730a3;
+  --bs-btn-active-border-color: #3730a3;
+}
+
+.form-control:focus {
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 0.2rem rgba(var(--hf-primary-rgb), 0.15);
+}
+
+.dropdown-menu {
+  --bs-dropdown-font-size: 0.875rem;
+  --bs-dropdown-border-color: var(--hf-border);
+  --bs-dropdown-link-active-bg: var(--hf-primary-soft);
+  --bs-dropdown-link-active-color: var(--hf-primary);
+}
+
+.breadcrumb {
+  --bs-breadcrumb-font-size: 0.8125rem;
+  --bs-breadcrumb-item-active-color: var(--hf-text-muted);
+}
+
+.card {
+  --bs-card-border-color: var(--hf-border);
+  --bs-card-border-radius: 12px;
+  --bs-card-inner-border-radius: 11px;
+}
+
+/* Data tables: roomier cells, small uppercase headings */
+.hf-table > :not(caption) > * > * {
+  padding: 0.875rem 1rem;
+}
+
+.hf-table > thead th {
+  background-color: var(--hf-bg);
+  color: var(--hf-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* ---------- Small helpers Bootstrap doesn't ship ---------- */
+.hf-status-dot {
+  font-size: 0.4rem;
+}
+
+.hf-empty-icon {
+  width: 56px;
+  height: 56px;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+.hf-icon-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  color: var(--hf-text-muted);
+}
+
+.hf-icon-btn:hover,
+.hf-icon-btn[aria-expanded="true"],
+.hf-profile-toggle:hover,
+.hf-profile-toggle[aria-expanded="true"] {
+  background-color: var(--hf-hover);
+  color: var(--hf-text);
+}
+
+.hf-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 0.8125rem;
+  flex-shrink: 0;
+}
+
+.hf-icon-circle {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+/* ---------- Header ---------- */
+.hf-header {
+  height: var(--hf-header-height);
+}
+
+.hf-header-search {
+  width: 100%;
+  max-width: 260px;
+}
+
+@media (min-width: 1400px) {
+  .hf-header-search {
+    max-width: 340px;
+  }
+}
+
+.hf-dropdown-notifications {
+  width: 360px;
+  max-width: calc(100vw - 1.5rem);
+}
+
+.hf-notification-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* ---------- Sidebar ---------- */
+.hf-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1045;
+  width: var(--hf-sidebar-width);
+  max-width: 85vw;
+  transition: width 0.2s ease, transform 0.25s ease;
+}
+
+.hf-sidebar-brand {
+  height: var(--hf-header-height);
+}
+
+.hf-sidebar-link {
+  color: var(--hf-text-muted);
+  white-space: nowrap;
+}
+
+.hf-sidebar-link:hover {
+  background-color: var(--hf-hover);
+  color: var(--hf-text);
+}
+
+.hf-sidebar-link .bi {
+  font-size: 1.1rem;
+  width: 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Tooltip shown beside an icon when the sidebar is collapsed (desktop only) */
+.hf-sidebar-tooltip {
+  display: none;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0.5rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.hf-sidebar-tooltip .tooltip-arrow {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.hf-sidebar-link:hover .hf-sidebar-tooltip,
+.hf-sidebar-link:focus-visible .hf-sidebar-tooltip {
+  opacity: 1;
+}
+
+.hf-content {
+  transition: margin-left 0.2s ease;
+}
+
+/* Desktop: fixed sidebar that can collapse to icons */
+@media (min-width: 992px) {
+  .hf-sidebar.is-collapsed {
+    width: var(--hf-sidebar-collapsed-width);
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-nav {
+    overflow: visible;
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-label {
+    display: none;
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-brand,
+  .hf-sidebar.is-collapsed .hf-sidebar-link {
+    justify-content: center;
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-tooltip {
+    display: block;
+  }
+
+  .hf-content {
+    margin-left: var(--hf-sidebar-width);
+  }
+
+  .hf-content.is-collapsed {
+    margin-left: var(--hf-sidebar-collapsed-width);
+  }
+}
+
+/* Mobile / tablet: sidebar becomes a slide-in drawer */
+@media (max-width: 991.98px) {
+  .hf-sidebar {
+    transform: translateX(-100%);
+  }
+
+  .hf-sidebar.is-open {
+    transform: none;
+  }
+}
