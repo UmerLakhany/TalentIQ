@@ -166,6 +166,68 @@ body {
   height: 6px;
 }
 
+/* Wide first table column: description truncates instead of stretching the table */
+.hf-cell-wide {
+  min-width: 220px;
+}
+
+.hf-cell-wide .text-truncate {
+  max-width: 420px;
+}
+
+/* Requirement table: readable text columns */
+.hf-cell-req {
+  min-width: 180px;
+}
+
+.hf-cell-text {
+  min-width: 220px;
+}
+
+/* Side panels stay in view while scrolling long pages (large screens only) */
+@media (min-width: 1200px) {
+  .hf-sticky-panel {
+    position: sticky;
+    top: calc(var(--hf-header-height) + 1.5rem);
+  }
+}
+
+/* CV drop zone */
+.hf-dropzone {
+  min-height: 170px;
+  border: 2px dashed var(--hf-border);
+  background-color: var(--hf-bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.hf-dropzone:hover,
+.hf-dropzone.is-dragging {
+  border-color: var(--hf-primary);
+  background-color: var(--hf-primary-soft);
+}
+
+#cv-input:focus-visible + .hf-dropzone {
+  outline: 2px solid var(--hf-primary);
+  outline-offset: 2px;
+}
+
+.hf-file-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Anchor targets land below the sticky header */
+.hf-anchor {
+  scroll-margin-top: calc(var(--hf-header-height) + 1rem);
+}
+
+.hf-spinner-xs {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-width: 0.12em;
+}
+
 /* Sortable table heading button — looks like the heading text */
 .hf-sort-btn {
   font: inherit;
@@ -206,6 +268,18 @@ body {
   height: 36px;
   font-size: 0.8125rem;
   flex-shrink: 0;
+}
+
+.hf-avatar-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 1.1rem;
+}
+
+/* Original CV preview */
+.hf-cv-frame {
+  height: 75vh;
+  min-height: 420px;
 }
 
 .hf-icon-circle {
@@ -315,6 +389,22 @@ body {
   .hf-sidebar.is-collapsed .hf-sidebar-brand,
   .hf-sidebar.is-collapsed .hf-sidebar-link {
     justify-content: center;
+  }
+
+  /* Collapsed: square, centred icon buttons. !important beats Bootstrap's
+     spacing utilities (p-3 / px-3 / py-2) used for the expanded layout. */
+  .hf-sidebar.is-collapsed .hf-sidebar-nav {
+    padding: 1rem 0 !important;
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-nav .nav {
+    align-items: center;
+  }
+
+  .hf-sidebar.is-collapsed .hf-sidebar-link {
+    width: 48px;
+    height: 44px;
+    padding: 0 !important;
   }
 
   .hf-sidebar.is-collapsed .hf-sidebar-tooltip {

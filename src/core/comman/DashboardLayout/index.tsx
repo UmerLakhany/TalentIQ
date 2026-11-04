@@ -1,14 +1,11 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
-import { AUTH_ROUTES, isActiveRoute } from "@/constants/navigation";
 import Footer from "@/core/comman/Footer";
 import Header from "@/core/comman/Header";
 import Sidebar from "@/core/comman/Sidebar";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -34,11 +31,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       desktop.removeEventListener("change", onBreakpointChange);
     };
   }, [mobileOpen]);
-
-  // Login / Register render without the panel shell
-  if (AUTH_ROUTES.some((route) => isActiveRoute(pathname, route))) {
-    return <>{children}</>;
-  }
 
   return (
     <div className="min-vh-100">

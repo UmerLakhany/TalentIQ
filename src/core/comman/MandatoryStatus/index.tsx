@@ -1,16 +1,16 @@
 interface MandatoryStatusProps {
-  passed: number | null;
-  total: number | null;
+  met: number;
+  total: number;
 }
 
 /**
- * Mandatory criteria are shown next to the score so a high weighted score
- * never hides a failed mandatory requirement.
+ * Shown next to the score so a high weighted score never hides
+ * a mandatory requirement that is not (fully) met.
  */
-export default function MandatoryStatus({ passed, total }: MandatoryStatusProps) {
-  if (passed === null || total === null) return null;
+export default function MandatoryStatus({ met, total }: MandatoryStatusProps) {
+  if (total === 0) return null;
 
-  const missing = total - passed;
+  const missing = total - met;
   return missing === 0 ? (
     <span className="small text-success-emphasis text-nowrap">
       <i className="bi bi-check-circle-fill me-1" aria-hidden="true" />

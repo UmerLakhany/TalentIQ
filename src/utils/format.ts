@@ -1,25 +1,3 @@
-const relativeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ["year", 31_536_000],
-  ["month", 2_592_000],
-  ["week", 604_800],
-  ["day", 86_400],
-  ["hour", 3_600],
-  ["minute", 60],
-];
-
-/** "6 minutes ago", "yesterday", … */
-export function formatRelativeTime(isoDate: string): string {
-  const seconds = Math.round((new Date(isoDate).getTime() - Date.now()) / 1000);
-  for (const [unit, unitSeconds] of UNITS) {
-    if (Math.abs(seconds) >= unitSeconds) {
-      return relativeFormatter.format(Math.round(seconds / unitSeconds), unit);
-    }
-  }
-  return "just now";
-}
-
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -27,9 +5,32 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
 /** "2026-10-28" -> "Oct 28, 2026" */
 export function formatDate(isoDate: string): string {
   return dateFormatter.format(new Date(isoDate));
+}
+
+/** "2026-11-04T09:40:00Z" -> "Nov 4, 9:40 AM" */
+export function formatDateTime(isoDate: string): string {
+  return dateTimeFormatter.format(new Date(isoDate));
+}
+
+/** 1536 (KB) -> "1.5 MB" */
+export function formatFileSize(sizeKb: number): string {
+  return sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${Math.round(sizeKb)} KB`;
+}
+
+/** 4.5 -> "4.5 yrs", 1 -> "1 yr" */
+export function formatYears(years: number): string {
+  return `${years} ${years === 1 ? "yr" : "yrs"}`;
 }
 
 const AVATAR_TONES = ["primary", "success", "info", "warning", "danger", "secondary"];

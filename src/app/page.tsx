@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The panel has no landing page — send visitors straight to the dashboard.
+// The panel starts at the Dashboard.
 export default function Home() {
   redirect("/dashboard");
 }

@@ -6,16 +6,8 @@ interface JobActionsProps {
   onDelete: (job: Job) => void;
 }
 
-/** Three-dot action menu used in both the table and grid views. */
+/** Three-dot menu used in the table and the phone cards. */
 export default function JobActions({ job, onDelete }: JobActionsProps) {
-  const links = [
-    { label: "View Job", href: `/jobs/${job.id}`, icon: "bi-eye" },
-    { label: "Edit Job", href: `/jobs/${job.id}/edit`, icon: "bi-pencil-square" },
-    { label: "Edit Criteria", href: `/jobs/${job.id}/criteria`, icon: "bi-sliders" },
-    { label: "Upload CVs", href: `/jobs/${job.id}/upload`, icon: "bi-cloud-arrow-up" },
-    { label: "View Candidates", href: `/jobs/${job.id}/candidates`, icon: "bi-people" },
-  ];
-
   return (
     <div className="dropdown">
       <button
@@ -29,14 +21,24 @@ export default function JobActions({ job, onDelete }: JobActionsProps) {
         <i className="bi bi-three-dots-vertical" />
       </button>
       <ul className="dropdown-menu dropdown-menu-end shadow p-2">
-        {links.map((link) => (
-          <li key={link.label}>
-            <Link href={link.href} className="dropdown-item rounded-2">
-              <i className={`bi ${link.icon} me-2 text-secondary`} aria-hidden="true" />
-              {link.label}
-            </Link>
-          </li>
-        ))}
+        <li>
+          <Link href={`/jobs/${job.id}`} className="dropdown-item rounded-2">
+            <i className="bi bi-eye me-2 text-secondary" aria-hidden="true" />
+            View Job &amp; Candidates
+          </Link>
+        </li>
+        <li>
+          <Link href={`/jobs/${job.id}#upload`} className="dropdown-item rounded-2">
+            <i className="bi bi-cloud-arrow-up me-2 text-secondary" aria-hidden="true" />
+            Upload CVs
+          </Link>
+        </li>
+        <li>
+          <Link href={`/jobs/${job.id}/edit`} className="dropdown-item rounded-2">
+            <i className="bi bi-sliders me-2 text-secondary" aria-hidden="true" />
+            Edit Criteria
+          </Link>
+        </li>
         <li>
           <hr className="dropdown-divider" />
         </li>

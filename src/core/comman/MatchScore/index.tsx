@@ -1,27 +1,13 @@
-import { getScoreBand, type AnalysisStatus } from "@/data/candidates";
+import { getScoreBand } from "@/data/candidates";
 
 interface MatchScoreProps {
+  /** null when the CV has not been analyzed yet */
   score: number | null;
-  analysisStatus: AnalysisStatus;
 }
 
-const PENDING_LABEL: Record<Exclude<AnalysisStatus, "Completed">, { label: string; icon: string; tone: string }> = {
-  Processing: { label: "Analyzing…", icon: "bi-arrow-repeat", tone: "primary" },
-  Queued: { label: "Queued", icon: "bi-hourglass-split", tone: "secondary" },
-  Failed: { label: "Analysis failed", icon: "bi-exclamation-triangle", tone: "danger" },
-};
-
-/** Score + band label + bar. Shows the analysis state instead when no score exists yet. */
-export default function MatchScore({ score, analysisStatus }: MatchScoreProps) {
-  if (score === null || analysisStatus !== "Completed") {
-    const pending = PENDING_LABEL[analysisStatus === "Completed" ? "Queued" : analysisStatus];
-    return (
-      <span className={`small text-${pending.tone} text-nowrap`}>
-        <i className={`bi ${pending.icon} me-1`} aria-hidden="true" />
-        {pending.label}
-      </span>
-    );
-  }
+/** Score + coloured bar + band label (Strong / Good / Partial / Low). */
+export default function MatchScore({ score }: MatchScoreProps) {
+  if (score === null) return <span className="text-secondary">—</span>;
 
   const band = getScoreBand(score);
   return (

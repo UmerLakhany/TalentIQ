@@ -1,177 +1,88 @@
-export type JobStatus = "Draft" | "Active" | "Paused" | "Closed";
-export type EmploymentType = "Full-time" | "Part-time" | "Contract" | "Internship";
-export type WorkplaceType = "Onsite" | "Remote" | "Hybrid";
+export type RequirementType = "mandatory" | "preferred" | "not_required";
+export type RequirementCategory = "experience" | "skill" | "education" | "other";
+
+export interface JobRequirement {
+  id: string;
+  category: RequirementCategory;
+  name: string;
+  type: RequirementType;
+}
 
 export interface Job {
   id: string;
   title: string;
-  department: string;
-  employmentType: EmploymentType;
-  location: string;
-  workplaceType: WorkplaceType;
-  applicants: number;
-  processing: number;
-  shortlisted: number;
-  status: JobStatus;
+  description: string;
+  /** Minimum years of professional experience */
+  minExperience: number;
+  requirements: JobRequirement[];
   /** ISO date (YYYY-MM-DD) */
   createdAt: string;
 }
 
-export const JOB_STATUSES: JobStatus[] = ["Active", "Draft", "Paused", "Closed"];
+export const REQUIREMENT_TYPE_LABELS: Record<RequirementType, string> = {
+  mandatory: "Mandatory",
+  preferred: "Preferred",
+  not_required: "Not required",
+};
 
-export const DEPARTMENTS = [
-  "Engineering",
-  "Design",
-  "Data & Analytics",
-  "Marketing",
-  "Sales",
-  "Human Resources",
-  "Customer Success",
-];
+export const REQUIREMENT_CATEGORY_LABELS: Record<RequirementCategory, string> = {
+  experience: "Experience",
+  skill: "Technical skill",
+  education: "Education",
+  other: "Other",
+};
 
-// Static mock jobs — replace with the jobs API later.
+// Static mock jobs — replace with GET /jobs later.
 export const mockJobs: Job[] = [
   {
     id: "job-101",
-    title: "Senior Backend Engineer",
-    department: "Engineering",
-    employmentType: "Full-time",
-    location: "Karachi, PK",
-    workplaceType: "Hybrid",
-    applicants: 48,
-    processing: 0,
-    shortlisted: 6,
-    status: "Active",
+    title: "Full-Stack Developer",
+    description: "Build and scale our recruitment platform end-to-end, from NestJS APIs to React/Next.js interfaces.",
+    minExperience: 3,
     createdAt: "2026-10-28",
+    requirements: [
+      { id: "r101-exp", category: "experience", name: "Minimum 3 years of professional experience", type: "mandatory" },
+      { id: "r101-js", category: "skill", name: "JavaScript", type: "mandatory" },
+      { id: "r101-ts", category: "skill", name: "TypeScript", type: "mandatory" },
+      { id: "r101-node", category: "skill", name: "Node.js", type: "mandatory" },
+      { id: "r101-nest", category: "skill", name: "NestJS", type: "mandatory" },
+      { id: "r101-react", category: "skill", name: "React.js or Next.js", type: "preferred" },
+      { id: "r101-pg", category: "skill", name: "PostgreSQL", type: "mandatory" },
+      { id: "r101-python", category: "skill", name: "Python", type: "not_required" },
+      { id: "r101-edu", category: "education", name: "Bachelor's degree in Computer Science or related field", type: "preferred" },
+      { id: "r101-scale", category: "other", name: "Experience building scalable applications", type: "preferred" },
+    ],
   },
   {
     id: "job-102",
-    title: "Product Designer",
-    department: "Design",
-    employmentType: "Full-time",
-    location: "Lahore, PK",
-    workplaceType: "Onsite",
-    applicants: 32,
-    processing: 0,
-    shortlisted: 4,
-    status: "Active",
-    createdAt: "2026-10-22",
+    title: "Frontend Developer (React)",
+    description: "Own the recruiter-facing UI: fast, accessible, responsive interfaces in React and Next.js.",
+    minExperience: 2,
+    createdAt: "2026-11-01",
+    requirements: [
+      { id: "r102-exp", category: "experience", name: "Minimum 2 years of professional experience", type: "mandatory" },
+      { id: "r102-react", category: "skill", name: "React.js", type: "mandatory" },
+      { id: "r102-ts", category: "skill", name: "TypeScript", type: "mandatory" },
+      { id: "r102-next", category: "skill", name: "Next.js", type: "preferred" },
+      { id: "r102-test", category: "skill", name: "Jest / React Testing Library", type: "preferred" },
+      { id: "r102-edu", category: "education", name: "Degree in Computer Science or equivalent experience", type: "preferred" },
+      { id: "r102-a11y", category: "other", name: "Experience with responsive and accessible UI", type: "preferred" },
+    ],
   },
   {
     id: "job-103",
-    title: "Frontend Developer (React)",
-    department: "Engineering",
-    employmentType: "Full-time",
-    location: "Remote",
-    workplaceType: "Remote",
-    applicants: 27,
-    processing: 5,
-    shortlisted: 2,
-    status: "Active",
-    createdAt: "2026-11-03",
-  },
-  {
-    id: "job-104",
-    title: "DevOps Engineer",
-    department: "Engineering",
-    employmentType: "Contract",
-    location: "Remote",
-    workplaceType: "Remote",
-    applicants: 15,
-    processing: 3,
-    shortlisted: 1,
-    status: "Active",
-    createdAt: "2026-10-30",
-  },
-  {
-    id: "job-105",
     title: "Data Analyst",
-    department: "Data & Analytics",
-    employmentType: "Full-time",
-    location: "Karachi, PK",
-    workplaceType: "Onsite",
-    applicants: 21,
-    processing: 0,
-    shortlisted: 3,
-    status: "Paused",
-    createdAt: "2026-10-12",
-  },
-  {
-    id: "job-106",
-    title: "HR Business Partner",
-    department: "Human Resources",
-    employmentType: "Full-time",
-    location: "Dubai, UAE",
-    workplaceType: "Hybrid",
-    applicants: 0,
-    processing: 0,
-    shortlisted: 0,
-    status: "Draft",
-    createdAt: "2026-11-02",
-  },
-  {
-    id: "job-107",
-    title: "Digital Marketing Specialist",
-    department: "Marketing",
-    employmentType: "Part-time",
-    location: "Lahore, PK",
-    workplaceType: "Remote",
-    applicants: 18,
-    processing: 0,
-    shortlisted: 2,
-    status: "Closed",
-    createdAt: "2026-09-18",
-  },
-  {
-    id: "job-108",
-    title: "Machine Learning Engineer",
-    department: "Data & Analytics",
-    employmentType: "Full-time",
-    location: "Remote",
-    workplaceType: "Remote",
-    applicants: 36,
-    processing: 8,
-    shortlisted: 5,
-    status: "Active",
-    createdAt: "2026-10-25",
-  },
-  {
-    id: "job-109",
-    title: "Customer Success Manager",
-    department: "Customer Success",
-    employmentType: "Full-time",
-    location: "London, UK",
-    workplaceType: "Hybrid",
-    applicants: 12,
-    processing: 0,
-    shortlisted: 1,
-    status: "Paused",
-    createdAt: "2026-10-05",
-  },
-  {
-    id: "job-110",
-    title: "QA Automation Engineer",
-    department: "Engineering",
-    employmentType: "Internship",
-    location: "Islamabad, PK",
-    workplaceType: "Onsite",
-    applicants: 0,
-    processing: 0,
-    shortlisted: 0,
-    status: "Draft",
-    createdAt: "2026-11-01",
-  },
-  {
-    id: "job-111",
-    title: "Sales Executive",
-    department: "Sales",
-    employmentType: "Full-time",
-    location: "Karachi, PK",
-    workplaceType: "Onsite",
-    applicants: 44,
-    processing: 0,
-    shortlisted: 7,
-    status: "Closed",
-    createdAt: "2026-09-02",
+    description: "Turn recruitment data into dashboards and insights for hiring managers.",
+    minExperience: 2,
+    createdAt: "2026-10-15",
+    requirements: [
+      { id: "r103-exp", category: "experience", name: "Minimum 2 years of professional experience", type: "mandatory" },
+      { id: "r103-sql", category: "skill", name: "SQL", type: "mandatory" },
+      { id: "r103-bi", category: "skill", name: "Power BI or Tableau", type: "mandatory" },
+      { id: "r103-python", category: "skill", name: "Python", type: "preferred" },
+      { id: "r103-edu", category: "education", name: "Bachelor's degree in Statistics, Mathematics or related field", type: "mandatory" },
+    ],
   },
 ];
+
+export const getJobById = (id: string) => mockJobs.find((job) => job.id === id);
