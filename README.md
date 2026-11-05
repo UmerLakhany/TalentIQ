@@ -2,24 +2,44 @@
 
 Express + TypeScript + Sequelize (PostgreSQL) API for the TalentIQ AI-powered CV screening system.
 
-## Setup
+## Quick start (everything in Docker)
 
-1. Install dependencies: `npm install`
-2. Start infrastructure (PostgreSQL, Redis, RabbitMQ, Adminer): `docker compose up -d`
-   - Adminer: http://localhost:8080 (server `postgres`, user `postgres`, password `postgres`, db `talentiq`)
-   - RabbitMQ UI: http://localhost:15672 (`talentiq` / `talentiq`)
-   - If PostgreSQL is already installed locally on 5432, either use it (create a `talentiq` database) or run
-     `POSTGRES_HOST_PORT=5433 docker compose up -d` and change `DB_URL` accordingly.
-3. Copy `.env.example` to `.env` and set `JWT_SECRET` and `DB_URL`.
-4. Run in development (auto-reload): `npm run dev`
+1. Copy `.env.example` to `.env` and set at least `JWT_SECRET` and `GEMINI_API_KEY`
+   (free key: https://aistudio.google.com/apikey). SMTP is optional: without it, emails such as the
+   verification code are printed in the API logs (`docker compose logs -f api`).
+2. Run:
+   ```sh
+   docker compose up -d --build
+   ```
+   This starts 6 services: PostgreSQL, Redis, RabbitMQ, Adminer, the **API** and the **CV worker**.
+   The worker waits until the API is healthy (the API creates the database tables on startup).
 
-The API is served at `http://localhost:4000/api/v1`. Tables are created from the models on startup
-(`DB_SYNC_ALTER=true`).
+| Service | URL |
+|---|---|
+| API | http://localhost:4000/api/v1 (health: `/api/v1/_health`) |
+| Adminer | http://localhost:8080 (system PostgreSQL, server `postgres`, `postgres` / `postgres`, db `talentiq`) |
+| RabbitMQ UI | http://localhost:15672 (`talentiq` / `talentiq`) |
+
+Useful commands: `docker compose ps`, `docker compose logs -f api worker`, `docker compose down`
+(data is kept in volumes; `docker compose down -v` deletes it). Uploaded CVs are stored in the `uploads`
+volume, shared by the API and the worker. Ports can be changed with `API_HOST_PORT` and `POSTGRES_HOST_PORT`.
+
+## Local development (API and worker with npm)
+
+1. `npm install`
+2. Start only the infrastructure: `docker compose up -d postgres redis rabbitmq adminer`
+   (if PostgreSQL is installed locally on 5432, set `POSTGRES_HOST_PORT=5433` and use that port in `DB_URL`).
+3. Copy `.env.example` to `.env` and fill it in.
+4. In two terminals: `npm run dev` (API, auto-reload) and `npm run worker` (CV worker).
+
+Tables are created from the models when the API starts (`DB_SYNC_ALTER=true`).
+Don't run the Docker `api` service and `npm run dev` on the same port at the same time.
 
 ## Scripts
-- `npm run dev` — run with ts-node + nodemon
+- `npm run dev` — API with ts-node + nodemon
+- `npm run worker` — CV analysis worker with ts-node + nodemon
 - `npm run build` — compile to `dist/`
-- `npm start` — run the compiled server
+- `npm start` / `npm run worker:prod` — run the compiled API / worker
 - `npm run typecheck` — type-check without emitting
 
 ## Response format
@@ -169,6 +189,32 @@ Re-queues a `failed` CV (clears previous results). `409` if the CV is not failed
 Deletes the candidate and its file.
 
 All candidate routes are also served under `/api/v1/candidates`.
+
+### GET /api/v1/recruiter/dashboard  (protected)
+Everything the Dashboard page shows, for the logged-in recruiter's jobs only (also at `/api/v1/dashboard`):
+`stats` (jobs, cvs, analyzed, averageScore, inProgress, failed, allMandatoryMet), `topCandidates` (top 5 by score
+across all jobs, with mandatory requirements met), `scoreDistribution` (Strong 85+, Good 70–84, Partial 50–69,
+Low 0–49), `processing` (queued / processing / completed / failed), `jobs` (per-job counts, average and best
+candidate) and `needsAttention` (latest failed CVs with the reason).
+
+### Re-analysis after editing a job
+`PUT /jobs/:id` compares the new criteria with the old ones. Requirements with the same category and name
+keep their id. If anything the AI uses changed (title, description, minimum experience, or a requirement added,
+removed or re-typed) and `reanalyze` is `true` (default), every CV of the job is queued again; the response
+contains `reanalysis: { criteriaChanged, requeued, rescored }`. With `reanalyze: false` existing verdicts are
+kept and scores are recalculated from them. Each re-queue increases the candidate's `analysisVersion`, and the
+worker discards outdated messages and results, so an analysis that was running during the edit can't overwrite
+the new one.
+
+### Caching (Redis)
+- `GET /jobs/:id/candidates` caches the job's candidate list + summary (`CACHE_TTL_CANDIDATES`, default 300s);
+  sorting and filtering are applied to the cached list, and signed `cvUrl` links are generated per request.
+- `GET /dashboard` caches the recruiter's dashboard (`CACHE_TTL_DASHBOARD`, default 120s).
+- Caches are cleared immediately when a CV is uploaded, starts / finishes / fails analysis (by the worker),
+  is retried or deleted, and when a job is created, edited or deleted.
+- Responses include `X-Cache: HIT` or `MISS`. If Redis is unavailable the API reads from PostgreSQL.
+
+Redis also stores OTP codes and password-reset tokens (with automatic expiry).
 
 ## CV analysis worker
 A separate process that consumes the RabbitMQ queue `cv_processing` and analyses each CV with an LLM:

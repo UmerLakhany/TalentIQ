@@ -1,7 +1,12 @@
 import fs from 'fs';
 import { NextFunction, Request, Response } from 'express';
 import asyncHandler from '../common/asyncHandler';
-import { jobUploadDir } from '../common/cvUpload';
+import { jobUploadDir } from '../common/storage';
+import CandidateRepository from '../repositories/candidate.repository';
+import CvProcessingQueue from '../lib/classes/CvProcessingQueue';
+import Cache from '../lib/classes/Cache';
+import { calculateMatchScore } from '../lib/analysis/scoring';
+import { Verdict } from '../lib/analysis/types';
 import { isUUID } from 'class-validator';
 import JobRepository, { JobSort } from '../repositories/job.repository';
 import CreateJobDTO from '../dto/classes/CreateJob.dto';
@@ -127,6 +132,7 @@ class JobService {
       buildRequirements(body),
     );
 
+    await Cache.invalidateJob(job.id, job.recruiterId); // the dashboard counts jobs
     return res.generalResponse('Job created successfully.', toJobResponse(job), 201);
   });
 
@@ -164,7 +170,13 @@ class JobService {
     return res.generalResponse('Job fetched successfully.', toJobResponse(job), 200);
   });
 
-  /** PUT /api/v1/recruiter/jobs/:id (full update: same body as create; requirements are replaced) */
+  /**
+   * PUT /api/v1/recruiter/jobs/:id (full update: same body as create).
+   * If the evaluation criteria changed and `reanalyze` is true (the default, as in the edit form),
+   * every CV of the job is queued again so all candidates are scored against the new criteria.
+   * With `reanalyze: false`, existing verdicts are kept and scores are recalculated from them
+   * (new requirements stay unassessed until the next analysis).
+   */
   static updateJob = asyncHandler(async (req: Request, res: Response) => {
     const body = req.body as UpdateJobDTO;
 
@@ -176,9 +188,30 @@ class JobService {
     const job = await loadOwnJob(req, res);
     if (!job) return;
 
-    const updated = await JobRepository.updateWithRequirements(job, jobFields(body), buildRequirements(body));
+    const { job: updated, criteriaChanged } = await JobRepository.updateWithRequirements(
+      job,
+      jobFields(body),
+      buildRequirements(body),
+    );
 
-    return res.generalResponse('Job updated successfully.', toJobResponse(updated), 200);
+    const reanalyze = body.reanalyze !== false;
+    let reanalysis: { criteriaChanged: boolean; requeued: number; rescored: number } = {
+      criteriaChanged,
+      requeued: 0,
+      rescored: 0,
+    };
+
+    if (criteriaChanged && reanalyze) {
+      reanalysis.requeued = await JobService.requeueAllCvs(updated);
+    } else if (criteriaChanged) {
+      reanalysis.rescored = await JobService.rescoreFromExistingVerdicts(updated);
+    }
+    await Cache.invalidateJob(updated.id, updated.recruiterId);
+
+    const message = reanalysis.requeued > 0
+      ? `Job updated successfully. ${reanalysis.requeued} CV(s) queued for re-analysis.`
+      : 'Job updated successfully.';
+    return res.generalResponse(message, { ...toJobResponse(updated), reanalysis }, 200);
   });
 
   /** DELETE /api/v1/recruiter/jobs/:id (also deletes its requirements) */
@@ -191,9 +224,47 @@ class JobService {
     await fs.promises
       .rm(jobUploadDir(job.id), { recursive: true, force: true })
       .catch((err) => console.error(`Failed to remove uploads for job ${job.id}:`, err?.message || err));
+    await Cache.invalidateJob(job.id, job.recruiterId);
 
     return res.generalResponse('Job deleted successfully.', { id: job.id }, 200);
   });
+
+  /** Queues every CV of the job again with a new analysisVersion. Returns how many were queued. */
+  private static async requeueAllCvs(job: Job): Promise<number> {
+    const candidates = await CandidateRepository.resetAllForJob(job.id);
+    let queued = 0;
+    for (const candidate of candidates) {
+      try {
+        await CvProcessingQueue.enqueue({
+          candidateId: candidate.id,
+          jobId: job.id,
+          analysisVersion: candidate.analysisVersion,
+        });
+        queued += 1;
+      } catch (err: any) {
+        console.error(`Failed to re-queue candidate ${candidate.id}:`, err?.message || err);
+        await CandidateRepository.markFailed(candidate, 'Could not queue the CV for re-analysis. Please retry.');
+      }
+    }
+    return queued;
+  }
+
+  /**
+   * Recalculates stored scores of analysed CVs from their existing verdicts, using the job's current
+   * requirement types. Verdicts for removed requirements are ignored. Returns how many were updated.
+   */
+  private static async rescoreFromExistingVerdicts(job: Job): Promise<number> {
+    const typeById = new Map((job.requirements ?? []).map((r) => [r.id, r.type]));
+    const candidates = await CandidateRepository.findAllForJob(job.id, 'completed');
+
+    for (const candidate of candidates) {
+      const rows = ((candidate.evaluation?.requirements ?? []) as { requirementId: string; verdict: Verdict }[])
+        .filter((row) => typeById.has(row.requirementId) && typeById.get(row.requirementId) !== 'not_required')
+        .map((row) => ({ type: typeById.get(row.requirementId)!, verdict: row.verdict }));
+      await candidate.update({ matchScore: calculateMatchScore(rows) });
+    }
+    return candidates.length;
+  }
 }
 
 export default JobService;

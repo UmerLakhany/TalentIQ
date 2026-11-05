@@ -6,6 +6,7 @@ import AuthMiddleware from '../auth/jwt';
 import CandidateRepository from '../repositories/candidate.repository';
 import CvProcessingQueue from '../lib/classes/CvProcessingQueue';
 import CvAccessToken from '../lib/classes/CvAccessToken';
+import Cache, { CACHE_TTL_SECONDS, CacheKeys } from '../lib/classes/Cache';
 import {
   CV_FIELD_NAME,
   RejectedFile,
@@ -21,15 +22,13 @@ import { CandidateCreationAttributes, PROCESSING_STATUSES, ProcessingStatus } fr
 
 const apiPublicUrl = () => (process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}/api/v1`).replace(/\/$/, '');
 
-/** Public shape of a candidate (matches Candidate in the recruiter panel: src/data/candidates.ts). */
-export const toCandidateResponse = (candidate: Candidate) => ({
+/** Candidate fields without the signed cvUrl (this part is safe to cache). */
+const toCandidateData = (candidate: Candidate) => ({
   id: candidate.id,
   jobId: candidate.jobId,
   fileName: candidate.fileName,
   fileType: candidate.fileType,
   fileSizeKb: Math.round((candidate.fileSizeBytes / 1024) * 10) / 10,
-  // Signed, short-lived link so it works directly in <a href> / <iframe> without an auth header.
-  cvUrl: `${apiPublicUrl()}/candidates/${candidate.id}/cv?token=${CvAccessToken.create(candidate.id)}`,
   status: candidate.status,
   ...(candidate.errorMessage && { errorMessage: candidate.errorMessage }),
   uploadedAt: candidate.createdAt.toISOString(),
@@ -38,6 +37,20 @@ export const toCandidateResponse = (candidate: Candidate) => ({
   ...(candidate.profile && { profile: candidate.profile }),
   ...(candidate.evaluation && { evaluation: candidate.evaluation }),
 });
+
+type CandidateData = ReturnType<typeof toCandidateData>;
+
+/**
+ * Adds the signed, short-lived CV link, so it works directly in <a href> / <iframe> without an
+ * auth header. Generated per response (never cached) so links are always fresh.
+ */
+const withCvUrl = <T extends { id: string }>(data: T) => ({
+  ...data,
+  cvUrl: `${apiPublicUrl()}/candidates/${data.id}/cv?token=${CvAccessToken.create(data.id)}`,
+});
+
+/** Public shape of a candidate (matches Candidate in the recruiter panel: src/data/candidates.ts). */
+export const toCandidateResponse = (candidate: Candidate) => withCvUrl(toCandidateData(candidate));
 
 const CV_MIME_TYPES = {
   PDF: 'application/pdf',
@@ -50,18 +63,59 @@ const CANDIDATE_SORTS: CandidateSort[] = ['score', 'name', 'experience', 'upload
 /** Queued and processing CVs are listed after analysed ones, then failed ones last. */
 const STATUS_ORDER: Record<ProcessingStatus, number> = { completed: 0, processing: 1, queued: 2, failed: 3 };
 
-const profileName = (c: Candidate) => String(c.profile?.name || c.fileName);
-const experienceYears = (c: Candidate) => Number(c.profile?.totalExperienceYears) || 0;
+const profileName = (c: CandidateData) => String(c.profile?.name || c.fileName);
+const experienceYears = (c: CandidateData) => Number(c.profile?.totalExperienceYears) || 0;
 
-const byScore = (a: Candidate, b: Candidate) =>
+const byScore = (a: CandidateData, b: CandidateData) =>
   (b.matchScore ?? -1) - (a.matchScore ?? -1) || profileName(a).localeCompare(profileName(b));
 
-const SORTERS: Record<CandidateSort, (a: Candidate, b: Candidate) => number> = {
+const SORTERS: Record<CandidateSort, (a: CandidateData, b: CandidateData) => number> = {
   score: byScore,
   name: (a, b) => profileName(a).localeCompare(profileName(b)),
   experience: (a, b) => experienceYears(b) - experienceYears(a) || byScore(a, b),
-  uploaded: (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  uploaded: (a, b) => Date.parse(b.uploadedAt) - Date.parse(a.uploadedAt),
 };
+
+interface JobCandidatesSnapshot {
+  summary: Record<string, number | null>;
+  /** Every candidate of the job with its rank (1 = best analysed), ready to filter / sort. */
+  candidates: (CandidateData & { rank: number | null })[];
+}
+
+/** Builds the cacheable candidate list + summary of one job from the database. */
+const buildJobCandidatesSnapshot = async (job: Job): Promise<JobCandidatesSnapshot> => {
+  const all = (await CandidateRepository.findAllForJob(job.id)).map(toCandidateData);
+
+  const rankById = new Map(
+    all
+      .filter((c) => c.status === 'completed')
+      .sort(byScore)
+      .map((c, index) => [c.id, index + 1]),
+  );
+
+  const count = (status: ProcessingStatus) => all.filter((c) => c.status === status).length;
+  const scores = all.filter((c) => c.status === 'completed' && c.matchScore !== null).map((c) => c.matchScore!);
+  const requirements = job.requirements ?? [];
+
+  return {
+    summary: {
+      totalCvs: all.length,
+      analyzed: count('completed'),
+      queued: count('queued'),
+      processing: count('processing'),
+      inProgress: count('queued') + count('processing'),
+      failed: count('failed'),
+      averageScore: scores.length ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length) : null,
+      topScore: scores.length ? Math.max(...scores) : null,
+      mandatory: requirements.filter((r) => r.type === 'mandatory').length,
+      preferred: requirements.filter((r) => r.type === 'preferred').length,
+    },
+    candidates: all.map((c) => ({ ...c, rank: rankById.get(c.id) ?? null })),
+  };
+};
+
+/** Clears cached data derived from a job's candidates (its ranking and the owner's dashboard). */
+const invalidateJobCache = (job: Pick<Job, 'id' | 'recruiterId'>) => Cache.invalidateJob(job.id, job.recruiterId);
 
 /**
  * Loads :id for the logged-in recruiter (with its job). Sends 404 and returns null when the id is
@@ -142,13 +196,14 @@ class CandidateService {
     let queued = 0;
     for (const candidate of candidates) {
       try {
-        await CvProcessingQueue.enqueue({ candidateId: candidate.id, jobId: job.id });
+        await CvProcessingQueue.enqueue({ candidateId: candidate.id, jobId: job.id, analysisVersion: candidate.analysisVersion ?? 0 });
         queued += 1;
       } catch (err: any) {
         console.error(`Failed to queue candidate ${candidate.id}:`, err?.message || err);
         await CandidateRepository.markFailed(candidate, QUEUE_FAILED_MESSAGE);
       }
     }
+    await invalidateJobCache(job);
 
     const message = queued === candidates.length
       ? `${queued} CV(s) uploaded and queued for analysis.`
@@ -175,38 +230,22 @@ class CandidateService {
       ? (req.query.status as ProcessingStatus)
       : undefined;
 
-    const all = await CandidateRepository.findAllForJob(job.id);
-
-    const rankById = new Map(
-      all
-        .filter((c) => c.status === 'completed')
-        .sort(byScore)
-        .map((c, index) => [c.id, index + 1]),
+    // Cached in Redis; cleared whenever a CV is uploaded, analysed, retried or deleted, or the job changes.
+    const { value: snapshot, hit } = await Cache.remember(
+      CacheKeys.jobCandidates(job.id),
+      CACHE_TTL_SECONDS.jobCandidates,
+      () => buildJobCandidatesSnapshot(job),
     );
+    res.setHeader('X-Cache', hit ? 'HIT' : 'MISS');
 
-    const listed = all
+    const listed = snapshot.candidates
       .filter((c) => !statusFilter || c.status === statusFilter)
       .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || SORTERS[sort](a, b));
 
-    const count = (status: ProcessingStatus) => all.filter((c) => c.status === status).length;
-    const scores = all.filter((c) => c.status === 'completed' && c.matchScore !== null).map((c) => c.matchScore!);
-    const requirements = job.requirements ?? [];
-
     return res.generalResponse('Candidates fetched successfully.', {
       job: { id: job.id, title: job.title },
-      summary: {
-        totalCvs: all.length,
-        analyzed: count('completed'),
-        queued: count('queued'),
-        processing: count('processing'),
-        inProgress: count('queued') + count('processing'),
-        failed: count('failed'),
-        averageScore: scores.length ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length) : null,
-        topScore: scores.length ? Math.max(...scores) : null,
-        mandatory: requirements.filter((r) => r.type === 'mandatory').length,
-        preferred: requirements.filter((r) => r.type === 'preferred').length,
-      },
-      candidates: listed.map((c) => ({ ...toCandidateResponse(c), rank: rankById.get(c.id) ?? null })),
+      summary: snapshot.summary,
+      candidates: listed.map(withCvUrl),
     }, 200);
   });
 
@@ -292,14 +331,21 @@ class CandidateService {
       return res.generalError('The CV file is no longer available. Please upload it again.', {}, 409);
     }
 
+    const job = (candidate as Candidate & { job: Job }).job;
     await CandidateRepository.resetForRetry(candidate);
     try {
-      await CvProcessingQueue.enqueue({ candidateId: candidate.id, jobId: candidate.jobId });
+      await CvProcessingQueue.enqueue({
+        candidateId: candidate.id,
+        jobId: candidate.jobId,
+        analysisVersion: candidate.analysisVersion,
+      });
     } catch (err: any) {
       console.error(`Failed to re-queue candidate ${candidate.id}:`, err?.message || err);
       await CandidateRepository.markFailed(candidate, QUEUE_FAILED_MESSAGE);
+      await invalidateJobCache(job);
       return res.generalError('Could not queue the CV for analysis. Please try again.', {}, 502);
     }
+    await invalidateJobCache(job);
 
     return res.generalResponse('CV queued for analysis again.', toCandidateResponse(candidate), 200);
   });
@@ -309,8 +355,10 @@ class CandidateService {
     const candidate = await loadOwnCandidate(req, res);
     if (!candidate) return;
 
+    const job = (candidate as Candidate & { job: Job }).job;
     await CandidateRepository.delete(candidate);
     await removeStoredFile(candidate);
+    await invalidateJobCache(job);
 
     return res.generalResponse('Candidate deleted successfully.', { id: candidate.id }, 200);
   });

@@ -26,6 +26,7 @@ class Candidate extends Model<CandidateAttributes, CandidateCreationAttributes> 
   declare evaluation: Record<string, any> | null;
   declare matchScore: number | null;
   declare attempts: number;
+  declare analysisVersion: number;
   declare processedAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -81,6 +82,11 @@ Candidate.init({
   matchScore: {
     type: DataTypes.FLOAT,
     allowNull: true,
+  },
+  analysisVersion: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
   },
   attempts: {
     type: DataTypes.INTEGER,

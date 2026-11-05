@@ -4,6 +4,7 @@ import recruiterRoutes from './recruiter';
 import recruiterAuthRoutes from './recruiter/auth';
 import recruiterJobsRoutes from './recruiter/jobs';
 import recruiterCandidatesRoutes from './recruiter/candidates';
+import DashboardService from '../../services/dashboard.service';
 
 const router: Router = express.Router();
 
@@ -13,6 +14,7 @@ router.use('/recruiter', recruiterRoutes);
 router.use('/auth', recruiterAuthRoutes);
 router.use('/jobs', AuthMiddleware.auth, recruiterJobsRoutes);
 router.use('/candidates', recruiterCandidatesRoutes);
+router.get('/dashboard', AuthMiddleware.auth, DashboardService.getDashboard);
 
 // health check
 router.get('/_health', (_req, res) => {

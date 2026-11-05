@@ -82,22 +82,51 @@ class JobRepository {
     });
   }
 
-  /** Updates the job and replaces its requirements in one transaction. */
+  /**
+   * Updates the job and syncs its requirements in one transaction. A requirement with the same
+   * category and name as before keeps its id (so existing AI verdicts still point at it); new ones
+   * are created and removed ones deleted.
+   * Returns the updated job and whether the evaluation criteria changed (anything the AI uses:
+   * title, description, minimum experience, or any requirement added / removed / re-typed).
+   */
   static async updateWithRequirements(
     job: Job,
     data: Pick<JobAttributes, 'title' | 'description' | 'minExperience'>,
     requirements: JobRequirementCreationAttributes[],
-  ): Promise<Job> {
+  ): Promise<{ job: Job; criteriaChanged: boolean }> {
+    const keyOf = (r: { category: string; name: string }) => `${r.category}|${r.name.trim().toLowerCase()}`;
+    const existing = new Map((job.requirements ?? []).map((r) => [keyOf(r), r]));
+
+    let criteriaChanged =
+      data.title !== job.title || data.description !== job.description || data.minExperience !== job.minExperience;
+
     await sequelize.transaction(async (transaction) => {
       await job.update(data, { transaction });
-      await JobRequirement.destroy({ where: { jobId: job.id }, transaction });
-      await JobRequirement.bulkCreate(
-        requirements.map((requirement) => ({ ...requirement, jobId: job.id })),
-        { transaction },
-      );
+
+      const keep = new Set<string>();
+      for (const requirement of requirements) {
+        const match = existing.get(keyOf(requirement));
+        if (match && !keep.has(match.id)) {
+          keep.add(match.id);
+          if (match.type !== requirement.type) criteriaChanged = true;
+          await match.update(
+            { name: requirement.name, type: requirement.type, sortOrder: requirement.sortOrder },
+            { transaction },
+          );
+        } else {
+          criteriaChanged = true;
+          await JobRequirement.create({ ...requirement, jobId: job.id }, { transaction });
+        }
+      }
+
+      const removed = (job.requirements ?? []).filter((r) => !keep.has(r.id)).map((r) => r.id);
+      if (removed.length > 0) {
+        criteriaChanged = true;
+        await JobRequirement.destroy({ where: { id: removed }, transaction });
+      }
     });
 
-    return (await JobRepository.findById(job.id))!;
+    return { job: (await JobRepository.findById(job.id))!, criteriaChanged };
   }
 
   /** Deletes the job; its requirements are removed by the ON DELETE CASCADE foreign key. */

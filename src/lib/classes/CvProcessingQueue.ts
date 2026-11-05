@@ -1,9 +1,11 @@
 import RabbitMQClass, { CV_PROCESSING_QUEUE } from '../../../settings/queue/rabbitmq';
 
-/** Message the CV worker receives for each uploaded CV. */
+/** Message the CV worker receives for each CV to analyse. */
 export interface CvProcessingMessage {
   candidateId: string;
   jobId: string;
+  /** Candidate.analysisVersion when queued; the worker skips the message if it has changed since. */
+  analysisVersion?: number;
 }
 
 class CvProcessingQueue {

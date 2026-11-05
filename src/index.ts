@@ -10,6 +10,7 @@ import './models';
 import v1Routes from './routes/v1';
 import { errorHandler, handleAPIResponse } from './middlewares';
 import APIResponse from './lib/classes/APIResponse';
+import { retryOnStartup } from './common/retry';
 
 const app: Express = express();
 const port = Number(process.env.PORT) || 4000;
@@ -31,9 +32,9 @@ app.use(errorHandler);
 
 const start = async () => {
   try {
-    await SequelizeClass.getInstance().connect();
-    await RedisClass.getInstance().connect();
-    await RabbitMQClass.getInstance().connect();
+    await retryOnStartup('PostgreSQL', () => SequelizeClass.getInstance().connect());
+    await retryOnStartup('Redis', () => RedisClass.getInstance().connect());
+    await retryOnStartup('RabbitMQ', () => RabbitMQClass.getInstance().connect());
     emailService.verifyConnection(); // logs only; a mail problem shouldn't stop the API
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}/api/v1`);

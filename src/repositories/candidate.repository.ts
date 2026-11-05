@@ -47,7 +47,10 @@ class CandidateRepository {
     return higher + 1;
   }
 
-  /** Clears previous results so the CV can be analysed again from scratch. */
+  /**
+   * Clears previous results and bumps analysisVersion so the CV is analysed again from scratch.
+   * Any older queued message or in-flight result for this CV is then ignored by the worker.
+   */
   static async resetForRetry(candidate: Candidate): Promise<Candidate> {
     return candidate.update({
       status: 'queued',
@@ -57,7 +60,30 @@ class CandidateRepository {
       evaluation: null,
       matchScore: null,
       processedAt: null,
+      analysisVersion: candidate.analysisVersion + 1,
     });
+  }
+
+  /**
+   * Re-analysis after a job edit: queues every CV of the job again (keeping the previous result
+   * visible until the new one arrives would mix old and new requirements, so results are cleared).
+   * Returns the updated candidates, each with its new analysisVersion.
+   */
+  static async resetAllForJob(jobId: string): Promise<Candidate[]> {
+    await Candidate.update(
+      {
+        status: 'queued',
+        errorMessage: null,
+        attempts: 0,
+        profile: null,
+        evaluation: null,
+        matchScore: null,
+        processedAt: null,
+        analysisVersion: Candidate.sequelize!.literal('analysis_version + 1') as unknown as number,
+      },
+      { where: { jobId } },
+    );
+    return Candidate.findAll({ where: { jobId } });
   }
 
   static async delete(candidate: Candidate): Promise<void> {

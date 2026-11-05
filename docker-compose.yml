@@ -1,3 +1,17 @@
+# TalentIQ: full stack with one command
+#   docker compose up -d --build                      -> infrastructure + API + CV worker
+#   docker compose up -d postgres redis rabbitmq adminer  -> infrastructure only (run API/worker with npm locally)
+#
+# Settings and secrets (GEMINI_API_KEY, JWT_SECRET, SMTP_...) come from .env (see .env.example).
+# Host names below point the API and worker at the containers instead of localhost.
+
+x-app-environment: &app-environment
+  DB_URL: postgres://postgres:postgres@postgres:5432/talentiq
+  REDIS_URL: redis://redis:6379
+  RABBITMQ_URL: amqp://talentiq:talentiq@rabbitmq:5672
+  UPLOAD_DIR: /app/uploads
+  PORT: "4000"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -15,7 +29,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres -d talentiq"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -25,6 +39,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
@@ -35,20 +54,75 @@ services:
       RABBITMQ_DEFAULT_PASS: talentiq
     ports:
       - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
+      - "15672:15672" # Management UI (talentiq / talentiq)
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      # check_port_connectivity passes only once the AMQP port accepts connections (ping passes earlier).
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 15s
+      retries: 20
+      start_period: 20s
 
   adminer:
     image: adminer:4
     container_name: talentiq-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8080:8080"   # server: postgres, user/password: postgres/postgres, database: talentiq
     depends_on:
       - postgres
+
+  api:
+    build: .
+    image: talentiq-backend:latest
+    container_name: talentiq-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *app-environment
+    ports:
+      - "${API_HOST_PORT:-4000}:4000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/v1/_health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    build: .
+    image: talentiq-backend:latest
+    container_name: talentiq-worker
+    restart: unless-stopped
+    command: ["node", "dist/src/worker.js"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *app-environment
+    volumes:
+      - uploads:/app/uploads   # same files the API stored
+    depends_on:
+      api:
+        condition: service_healthy   # the API creates the database tables on startup
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  uploads:

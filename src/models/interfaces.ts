@@ -75,6 +75,11 @@ export interface CandidateAttributes {
   evaluation: Record<string, any> | null;
   matchScore: number | null;
   attempts: number;
+  /**
+   * Increases every time the CV is queued again (retry, re-analysis after a job edit).
+   * The worker ignores messages and results for an older version.
+   */
+  analysisVersion: number;
   processedAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;

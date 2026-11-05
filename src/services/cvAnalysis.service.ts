@@ -6,6 +6,7 @@ import { analyzeCv } from '../lib/analysis/cvAnalyzer';
 import { CvAnalysisResult } from '../lib/analysis/types';
 import { AnalysisError } from '../lib/errors';
 import { CvProcessingMessage } from '../lib/classes/CvProcessingQueue';
+import Cache from '../lib/classes/Cache';
 
 /** How many times one CV may be picked up (e.g. after a worker crash) before it is marked failed. */
 const MAX_ATTEMPTS = Number(process.env.CV_MAX_ATTEMPTS) || 3;
@@ -56,19 +57,17 @@ class CvAnalysisService {
       log(candidateId, 'skipped: candidate no longer exists (job or CV deleted)');
       return;
     }
+
+    // A newer analysis was requested (retry / job edited) after this message was queued.
+    const version = typeof message.analysisVersion === 'number' ? message.analysisVersion : candidate.analysisVersion;
+    if (version !== candidate.analysisVersion) {
+      log(candidateId, `skipped: outdated message (v${version}, current v${candidate.analysisVersion})`);
+      return;
+    }
     if (candidate.status === 'completed') {
       log(candidateId, 'skipped: already analysed');
       return;
     }
-    if (candidate.attempts >= MAX_ATTEMPTS) {
-      await candidate.update({ status: 'failed', errorMessage: `Analysis failed after ${MAX_ATTEMPTS} attempts. Please retry.` });
-      log(candidateId, `failed: reached ${MAX_ATTEMPTS} attempts`);
-      return;
-    }
-
-    await candidate.update({ status: 'processing', attempts: candidate.attempts + 1, errorMessage: null });
-    log(candidateId, `processing "${candidate.fileName}" (attempt ${candidate.attempts})`);
-    const startedAt = Date.now();
 
     const job = await JobRepository.findById(candidate.jobId);
     if (!job) {
@@ -76,26 +75,53 @@ class CvAnalysisService {
       return;
     }
 
+    /**
+     * Saves only if no newer analysis was requested meanwhile, then clears the cached ranking and
+     * dashboard so the next API call shows the new status. Returns false if the result was outdated.
+     */
+    const save = async (values: Partial<Record<string, unknown>>): Promise<boolean> => {
+      const [updated] = await Candidate.update(values, { where: { id: candidateId, analysisVersion: version } });
+      await Cache.invalidateJob(job.id, job.recruiterId);
+      return updated > 0;
+    };
+
+    if (candidate.attempts >= MAX_ATTEMPTS) {
+      await save({ status: 'failed', errorMessage: `Analysis failed after ${MAX_ATTEMPTS} attempts. Please retry.` });
+      log(candidateId, `failed: reached ${MAX_ATTEMPTS} attempts`);
+      return;
+    }
+
+    const attempt = candidate.attempts + 1;
+    if (!(await save({ status: 'processing', attempts: attempt, errorMessage: null }))) {
+      log(candidateId, 'skipped: a newer analysis was requested');
+      return;
+    }
+    log(candidateId, `processing "${candidate.fileName}" (attempt ${attempt}, v${version})`);
+    const startedAt = Date.now();
+
     try {
       const text = await extractCvText(fromStoragePath(candidate.storagePath), candidate.fileType);
       const result = await analyzeWithRetries(candidateId, () => analyzeCv(job, text));
 
-      await candidate.update({
+      const saved = await save({
         status: 'completed',
-        profile: result.profile as unknown as Record<string, any>,
-        evaluation: result.evaluation as unknown as Record<string, any>,
+        profile: result.profile,
+        evaluation: result.evaluation,
         matchScore: result.matchScore,
         processedAt: new Date(),
         errorMessage: null,
       });
-      log(candidateId, `completed: score ${result.matchScore} (${result.model}, ${Math.round((Date.now() - startedAt) / 1000)}s)`);
+      const seconds = Math.round((Date.now() - startedAt) / 1000);
+      log(candidateId, saved
+        ? `completed: score ${result.matchScore} (${result.model}, ${seconds}s)`
+        : 'discarded result: the job changed during analysis (newer analysis queued)');
     } catch (err: any) {
       if (!(err instanceof AnalysisError)) {
         // Programming error or database problem: keep the CV queued and let RabbitMQ redeliver it.
-        await candidate.update({ status: 'queued' }).catch(() => undefined);
+        await save({ status: 'queued' }).catch(() => undefined);
         throw err;
       }
-      await candidate.update({ status: 'failed', errorMessage: err.userMessage });
+      await save({ status: 'failed', errorMessage: err.userMessage });
       log(candidateId, `failed: ${err.message}`);
     }
   }
