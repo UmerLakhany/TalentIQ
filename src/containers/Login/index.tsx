@@ -141,7 +141,10 @@ export default function LoginPage() {
       </form>
 
       <p className="small text-secondary text-center mt-4 mb-0">
-        Don&apos;t have an account? Contact your workspace administrator.
+        Don&apos;t have an account?{" "}
+        <Link href={route.register} className="fw-medium text-decoration-none">
+          Create one
+        </Link>
       </p>
     </>
   );

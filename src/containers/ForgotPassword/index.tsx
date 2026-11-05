@@ -1,47 +1,128 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import InputField from "@/components/Input";
+import OtpInput from "@/components/OtpInput";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
 import { emailRegex } from "@/utils";
 
-type ForgotPasswordFormValues = {
+/**
+ * Forgot password, matching the backend flow:
+ *   1. Email  -> POST /recruiter/auth/forgot-password  { email }        (emails a 6-digit code)
+ *   2. Code   -> POST /recruiter/auth/verify-reset-otp { email, otp }   (returns a one-time reset_token)
+ *   3. Change password page (?token=reset_token) -> POST /recruiter/auth/reset-password
+ */
+
+const OTP_LENGTH = 6;
+/** Seconds before another code can be requested (same as the backend's OTP_RESEND_COOLDOWN). */
+const RESEND_COOLDOWN = 60;
+
+type EmailFormValues = {
   email: string;
 };
 
-export default function ForgotPasswordPage() {
-  const [loading, setLoading] = useState(false);
-  // Email the reset link was sent to — switches the page to the "check your email" view
-  const [sentTo, setSentTo] = useState<string | null>(null);
+type CodeFormValues = {
+  otp: string;
+};
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ForgotPasswordFormValues>({
+export default function ForgotPasswordPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  // Email the code was sent to — switches the page to the "enter code" step
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+  const emailForm = useForm<EmailFormValues>({
     defaultValues: { email: "" },
   });
 
-  // *For Submit Form
-  const submitForm = async (formData: ForgotPasswordFormValues) => {
+  const codeForm = useForm<CodeFormValues>({
+    defaultValues: { otp: "" },
+  });
+
+  // *For Step 1: send the reset code
+  const sendCode = async (email: string) => {
+    // Same shape as POST /recruiter/auth/forgot-password
+    const payload = {
+      email: email.trim().toLowerCase(),
+    };
+
+    console.log("Forgot password payload:", payload);
+
+    // The backend gives the same answer whether or not the email is registered
+    SuccessToaster("If an account exists for this email, a reset code has been sent.");
+    setSentTo(payload.email);
+    setSecondsLeft(RESEND_COOLDOWN);
+  };
+
+  const submitEmail = async (formData: EmailFormValues) => {
     setLoading(true);
     try {
-      const payload = {
-        email: formData.email,
-      };
-
-      console.log("Forgot password payload:", payload);
-
-      SuccessToaster("Password reset link sent");
-      setSentTo(formData.email);
+      await sendCode(formData.email);
     } catch (error: unknown) {
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
+  };
+
+  // *For Resend Code
+  const resendCode = async () => {
+    if (!sentTo) return;
+    setResending(true);
+    try {
+      await sendCode(sentTo);
+      codeForm.reset({ otp: "" });
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // *For Step 2: verify the code, then continue to the change password page
+  const submitCode = async (formData: CodeFormValues) => {
+    setLoading(true);
+    try {
+      // Same shape as POST /recruiter/auth/verify-reset-otp
+      const payload = {
+        email: sentTo!,
+        otp: formData.otp,
+      };
+
+      console.log("Verify reset code payload:", payload);
+
+      // Static for now — replace with data.reset_token returned by the verify-reset-otp API
+      const resetToken = "demo-reset-token";
+
+      SuccessToaster("Code verified. You can now set a new password.");
+
+      setTimeout(() => {
+        router.push(`${route.changePassword}?token=${encodeURIComponent(resetToken)}`);
+      }, 200);
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // *For "Use a different email"
+  const changeEmail = () => {
+    setSentTo(null);
+    setSecondsLeft(0);
+    codeForm.reset({ otp: "" });
   };
 
   const backToLogin = (
@@ -51,54 +132,121 @@ export default function ForgotPasswordPage() {
     </Link>
   );
 
+  /* ---------- Step 2: enter the code ---------- */
   if (sentTo) {
+    const otpError = codeForm.formState.errors.otp;
+
     return (
-      <div className="text-center">
-        <span className="hf-empty-icon rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fs-3 mb-4">
-          <i className="bi bi-envelope-check" aria-hidden="true" />
-        </span>
-        <h1 className="h3 fw-bold text-body-emphasis mb-2">Check your email</h1>
-        <p className="text-secondary mb-4">
-          We&apos;ve sent a password reset link to <span className="fw-semibold text-body-emphasis">{sentTo}</span>.
+      <>
+        <div className="mb-4">
+          <span className="hf-empty-icon rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fs-3 mb-3">
+            <i className="bi bi-envelope-check" aria-hidden="true" />
+          </span>
+          <h1 className="h3 fw-bold text-body-emphasis mb-1">Check your email</h1>
+          <p className="text-secondary mb-0">
+            If an account exists for <span className="fw-semibold text-body-emphasis text-break">{sentTo}</span>, we&apos;ve
+            sent a {OTP_LENGTH}-digit code to reset your password.
+          </p>
+        </div>
+
+        <form onSubmit={codeForm.handleSubmit(submitCode)} noValidate>
+          <div className="mb-3">
+            <label className="form-label" style={{ fontWeight: 500 }}>
+              Reset code
+            </label>
+            <Controller
+              name="otp"
+              control={codeForm.control}
+              rules={{
+                required: "Enter the reset code.",
+                validate: (value: string) =>
+                  new RegExp(`^\\d{${OTP_LENGTH}}$`).test(value) || `Enter all ${OTP_LENGTH} digits.`,
+              }}
+              render={({ field }) => (
+                <OtpInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  length={OTP_LENGTH}
+                  disabled={loading}
+                  hasError={!!otpError}
+                  describedBy={otpError ? "reset-otp-error" : "reset-otp-help"}
+                />
+              )}
+            />
+            {otpError ? (
+              <div id="reset-otp-error" className="invalid-feedback d-block">
+                {otpError.message}
+              </div>
+            ) : (
+              <small id="reset-otp-help" className="text-muted">
+                The code expires in 10 minutes.
+              </small>
+            )}
+          </div>
+
+          <button type="submit" className="btn btn-primary w-100 py-2 fw-semibold mt-1" disabled={loading}>
+            {loading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                Verifying…
+              </>
+            ) : (
+              "Verify code"
+            )}
+          </button>
+        </form>
+
+        <p className="small text-secondary text-center mt-4 mb-2">
+          Didn&apos;t receive the code?{" "}
+          {secondsLeft > 0 ? (
+            <span>
+              Resend in <span className="fw-semibold text-body-emphasis">{secondsLeft}s</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 align-baseline fw-medium text-decoration-none"
+              onClick={resendCode}
+              disabled={resending}
+            >
+              {resending ? "Sending…" : "Resend code"}
+            </button>
+          )}
         </p>
-
-        <Link href={route.login} className="btn btn-primary w-100 py-2 fw-semibold mb-3">
-          Back to login
-        </Link>
-
-        <p className="small text-secondary mb-0">
-          Didn&apos;t receive the email?{" "}
+        <p className="small text-center mb-0">
           <button
             type="button"
             className="btn btn-link btn-sm p-0 align-baseline fw-medium text-decoration-none"
-            onClick={() => submitForm({ email: sentTo })}
-            disabled={loading}
+            onClick={changeEmail}
           >
-            Resend
+            Use a different email
           </button>
         </p>
-      </div>
+
+        <div className="text-center mt-4">{backToLogin}</div>
+      </>
     );
   }
 
+  /* ---------- Step 1: enter the email ---------- */
   return (
     <>
       <div className="mb-4">
         <h1 className="h3 fw-bold text-body-emphasis mb-1">Forgot password?</h1>
         <p className="text-secondary mb-0">
-          Enter the email linked to your account and we&apos;ll send you a link to reset your password.
+          Enter the email linked to your account and we&apos;ll send you a code to reset your password.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(submitForm)} noValidate>
+      <form onSubmit={emailForm.handleSubmit(submitEmail)} noValidate>
         <InputField
           id="email"
           name="email"
           type="email"
           label="Email address"
           placeholder="you@company.com"
-          register={register}
-          errors={errors}
+          register={emailForm.register}
+          errors={emailForm.formState.errors}
           rules={{
             required: "Email is required.",
             pattern: {
@@ -116,7 +264,7 @@ export default function ForgotPasswordPage() {
               Sending…
             </>
           ) : (
-            "Send reset link"
+            "Send reset code"
           )}
         </button>
       </form>
