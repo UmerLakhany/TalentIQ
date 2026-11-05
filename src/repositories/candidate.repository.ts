@@ -1,5 +1,13 @@
-import { Candidate } from '../models';
-import { CandidateCreationAttributes } from '../models/interfaces';
+import { Op } from 'sequelize';
+import { Candidate, Job, JobRequirement } from '../models';
+import { CandidateCreationAttributes, ProcessingStatus } from '../models/interfaces';
+
+const jobWithRequirements = (where: Record<string, unknown> = {}) => ({
+  model: Job,
+  as: 'job',
+  where,
+  include: [{ model: JobRequirement, as: 'requirements' }],
+});
 
 class CandidateRepository {
   static async bulkCreate(data: CandidateCreationAttributes[]): Promise<Candidate[]> {
@@ -8,6 +16,52 @@ class CandidateRepository {
 
   static async markFailed(candidate: Candidate, errorMessage: string): Promise<Candidate> {
     return candidate.update({ status: 'failed', errorMessage });
+  }
+
+  static async findAllForJob(jobId: string, status?: ProcessingStatus): Promise<Candidate[]> {
+    return Candidate.findAll({
+      where: { jobId, ...(status && { status }) },
+      order: [['createdAt', 'ASC']],
+    });
+  }
+
+  /** Finds a candidate only if its job belongs to the recruiter; includes the job and its requirements. */
+  static async findByIdForRecruiter(id: string, recruiterId: string): Promise<Candidate | null> {
+    return Candidate.findOne({
+      where: { id },
+      include: [jobWithRequirements({ recruiterId })],
+      order: [[{ model: Job, as: 'job' }, { model: JobRequirement, as: 'requirements' }, 'sortOrder', 'ASC']],
+    });
+  }
+
+  static async findById(id: string): Promise<Candidate | null> {
+    return Candidate.findByPk(id);
+  }
+
+  /** 1 + the number of analysed candidates in the same job with a higher score. */
+  static async getRank(candidate: Candidate): Promise<number | null> {
+    if (candidate.status !== 'completed' || candidate.matchScore === null) return null;
+    const higher = await Candidate.count({
+      where: { jobId: candidate.jobId, status: 'completed', matchScore: { [Op.gt]: candidate.matchScore } },
+    });
+    return higher + 1;
+  }
+
+  /** Clears previous results so the CV can be analysed again from scratch. */
+  static async resetForRetry(candidate: Candidate): Promise<Candidate> {
+    return candidate.update({
+      status: 'queued',
+      errorMessage: null,
+      attempts: 0,
+      profile: null,
+      evaluation: null,
+      matchScore: null,
+      processedAt: null,
+    });
+  }
+
+  static async delete(candidate: Candidate): Promise<void> {
+    await candidate.destroy();
   }
 }
 

@@ -17,5 +17,6 @@ router.delete('/:id', JobService.deleteJob);
 
 // CVs: ownership is checked before any file is stored.
 router.post('/:id/cvs', JobService.requireOwnJob, uploadCvFiles, CandidateService.uploadCvs);
+router.get('/:id/candidates', JobService.requireOwnJob, CandidateService.listForJob);
 
 export default router;

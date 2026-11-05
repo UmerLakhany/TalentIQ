@@ -143,6 +143,33 @@ Deleting a job also deletes its candidates and their uploaded files.
 
 All job routes are also served under `/api/v1/jobs`.
 
+### GET /api/v1/recruiter/jobs/:id/candidates  (protected)
+All CVs of a job plus a progress summary. Query (optional): `sort` = `score` (default) | `name` |
+`experience` | `uploaded`; `status` = `queued` | `processing` | `completed` | `failed`.
+Analysed candidates come first, then processing, queued and failed. `rank` is the position by match score
+among analysed candidates (1 = best), or null.
+Returns `{ job: { id, title }, summary: { totalCvs, analyzed, queued, processing, inProgress, failed, averageScore, topScore, mandatory, preferred }, candidates: [...] }`.
+
+Each candidate: `{ id, jobId, fileName, fileType, fileSizeKb, cvUrl, status, errorMessage?, uploadedAt, processedAt, matchScore, rank, profile?, evaluation? }`
+(`profile` / `evaluation` match `CandidateProfile` / `CandidateEvaluation` in the recruiter panel).
+
+### GET /api/v1/recruiter/candidates/:id  (protected)
+One candidate with `rank` and its `job` (including requirements, to label the per-requirement verdicts).
+`404` if it doesn't exist or belongs to another recruiter's job.
+
+### GET /api/v1/recruiter/candidates/:id/cv
+The original file, shown in the browser; add `&download=1` to download it with the original name.
+Access: the signed `?token=` already included in `cvUrl` (valid `CV_URL_EXPIRY_MINUTES`, only for that CV),
+or an `Authorization: Bearer` header.
+
+### POST /api/v1/recruiter/candidates/:id/retry  (protected)
+Re-queues a `failed` CV (clears previous results). `409` if the CV is not failed or the file is missing.
+
+### DELETE /api/v1/recruiter/candidates/:id  (protected)
+Deletes the candidate and its file.
+
+All candidate routes are also served under `/api/v1/candidates`.
+
 ## CV analysis worker
 A separate process that consumes the RabbitMQ queue `cv_processing` and analyses each CV with an LLM:
 
