@@ -1,0 +1,30 @@
+{
+  "welcome": {
+    "subject": "Welcome to TalentIQ!",
+    "template": "Hey {{name}} Welcome to TalentIQ. \n  here's your OTP code {{otp}}"
+  },
+  "passwordReset": {
+    "subject": "Reset Your Password",
+    "template": "<p>Hi {{name}},</p><p>Click <a href='{{resetLink}}'>here</a> to reset your password.</p>"
+  },
+  "otp": {
+    "subject": "Your OTP Code",
+    "template": "<p>Dear {{name}},</p><p>Your OTP is: <b>{{otp}}</b></p>"
+  },
+  "accountApproved": {
+    "subject": "Account Approved",
+    "template": "<p>Congratulations {{name}}, your account has been approved!</p>"
+  },
+  "accountRejected": {
+    "subject": "Account Rejected",
+    "template": "<p>Dear {{name}}, your account has been rejected for the following reason: {{rejectionReason}}</p>"
+  },
+  "verifyEmail": {
+    "subject": "Verify Your Email Address",
+    "template": "<p>Hello {{name}},</p><p>Please verify your email address by clicking <a href='{{verifyLink}}'>here</a>. This link will expire in 24 hours.</p>"
+  },
+  "accountVerificationSubmitted": {
+    "subject": "Account Verification Submitted",
+    "template": "<p>Dear {{name}}, Your account has been submitted for verification. You'll be notified once it's verified.</p>"
+  }
+}
