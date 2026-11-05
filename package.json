@@ -8,7 +8,9 @@
     "start": "node dist/src/index.js",
     "build": "tsc -p tsconfig.json",
     "start:prod": "npm run build && node dist/src/index.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "worker": "nodemon --watch src --watch settings --ext ts,json --exec ts-node src/worker.ts",
+    "worker:prod": "node dist/src/worker.js"
   },
   "keywords": [],
   "author": "",
@@ -24,8 +26,10 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.13.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "redis": "^4.7.1",

@@ -143,6 +143,29 @@ Deleting a job also deletes its candidates and their uploaded files.
 
 All job routes are also served under `/api/v1/jobs`.
 
+## CV analysis worker
+A separate process that consumes the RabbitMQ queue `cv_processing` and analyses each CV with an LLM:
+
+```sh
+npm run worker        # development (auto-reload)
+npm run worker:prod   # compiled (after npm run build)
+```
+
+Per CV: status `processing` → extract text (pdf-parse / mammoth) → send the CV text and the job's
+requirements to the LLM → validate the JSON reply → calculate the match score → save `profile`,
+`evaluation`, `matchScore`, status `completed`. Unreadable files (scanned images, password-protected,
+corrupted) and AI errors that persist after retries set status `failed` with a readable `errorMessage`.
+
+- **Scoring** (same as the recruiter panel's `utils/scoring.ts`): mandatory requirements 70%, preferred 30%
+  (a group with no requirements gives its weight to the other); `met` = 1, `partial` = 0.5,
+  `not_met` / `not_found` = 0; `not_required` requirements are ignored.
+- **Reliability**: messages are acknowledged only after the result is saved, so CVs survive a worker crash;
+  a CV is attempted at most `CV_MAX_ATTEMPTS` times. Rate limits / overloads are retried with backoff
+  (15s, 30s, 60s) and the next model in `GEMINI_FALLBACK_MODELS` is tried immediately.
+- **Concurrency**: `WORKER_CONCURRENCY` CVs at a time per worker; run more workers to scale.
+- **LLM**: `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`, `LLM_TIMEOUT_MS`.
+  Other providers can be added in `src/lib/ai/providers`.
+
 ### GET /api/v1/_health
 Health check.
 

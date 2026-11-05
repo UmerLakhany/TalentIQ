@@ -19,12 +19,17 @@ class SequelizeClass {
     return SequelizeClass.instance;
   }
 
-  /** Verifies the connection and syncs models. Call once before the server starts listening. */
-  public async connect(): Promise<void> {
+  /**
+   * Verifies the connection and (by default) syncs models. Call once before the server starts.
+   * Only the API syncs; the worker passes { sync: false } so two processes never alter tables at once.
+   */
+  public async connect({ sync = true }: { sync?: boolean } = {}): Promise<void> {
     await this.sequelize.authenticate();
     console.log('Database connected.');
-    await this.sequelize.sync({ alter: process.env.DB_SYNC_ALTER === 'true' });
-    console.log('Database synchronized.');
+    if (sync) {
+      await this.sequelize.sync({ alter: process.env.DB_SYNC_ALTER === 'true' });
+      console.log('Database synchronized.');
+    }
   }
 
   public close(): Promise<void> {

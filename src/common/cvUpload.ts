@@ -11,7 +11,8 @@ export const CV_MAX_FILE_SIZE_MB = Number(process.env.CV_MAX_FILE_SIZE_MB) || 5;
 /** Form-data field name the files must be sent in. */
 export const CV_FIELD_NAME = 'files';
 
-export const UPLOAD_ROOT = path.resolve(process.cwd(), process.env.UPLOAD_DIR || 'uploads');
+export { UPLOAD_ROOT, jobUploadDir, toStoragePath, fromStoragePath } from './storage';
+import { jobUploadDir } from './storage';
 
 const ALLOWED_TYPES: Record<string, { type: CvFileType; mimeTypes: string[] }> = {
   '.pdf': { type: 'PDF', mimeTypes: ['application/pdf'] },
@@ -33,15 +34,6 @@ declare module 'express-serve-static-core' {
     rejectedFiles?: RejectedFile[];
   }
 }
-
-/** Folder that holds one job's CVs. */
-export const jobUploadDir = (jobId: string) => path.join(UPLOAD_ROOT, 'cvs', jobId);
-
-/** Path stored in the database (relative to UPLOAD_ROOT, with forward slashes). */
-export const toStoragePath = (absolutePath: string) =>
-  path.relative(UPLOAD_ROOT, absolutePath).split(path.sep).join('/');
-
-export const fromStoragePath = (storagePath: string) => path.join(UPLOAD_ROOT, ...storagePath.split('/'));
 
 /**
  * Multer reads non-ASCII file names as latin1. Re-decode them as UTF-8, unless that produces

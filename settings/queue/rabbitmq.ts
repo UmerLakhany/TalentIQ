@@ -8,11 +8,23 @@ type AmqpConfirmChannel = Awaited<ReturnType<AmqpConnection['createConfirmChanne
 export const CV_PROCESSING_QUEUE = process.env.CV_PROCESSING_QUEUE || 'cv_processing';
 
 const RECONNECT_DELAY_MS = 5000;
+/** Wait before putting a message back after an unexpected error (e.g. database down), to avoid a hot loop. */
+const REQUEUE_DELAY_MS = 5000;
+
+export type MessageHandler = (payload: any) => Promise<void>;
+
+interface Consumer {
+  queue: string;
+  prefetch: number;
+  handler: MessageHandler;
+}
 
 class RabbitMQClass {
   private static instance: RabbitMQClass | null = null;
   private connection: AmqpConnection | null = null;
   private channel: AmqpConfirmChannel | null = null;
+  /** Registered consumers; re-subscribed automatically after a reconnect. */
+  private consumers: Consumer[] = [];
   private connecting: Promise<void> | null = null;
   private closing = false;
 
@@ -54,6 +66,57 @@ class RabbitMQClass {
     this.connection = connection;
     this.channel = channel;
     console.log('RabbitMQ connected.');
+
+    for (const consumer of this.consumers) {
+      await this.startConsumer(consumer);
+    }
+  }
+
+  /**
+   * Consumes JSON messages from a queue, at most `prefetch` at a time. A message is acknowledged
+   * (removed) after the handler resolves; if the handler throws it is put back on the queue after
+   * a short delay. Unparseable messages are discarded.
+   */
+  public async consume(queue: string, prefetch: number, handler: MessageHandler): Promise<void> {
+    await this.connect();
+    const consumer = { queue, prefetch, handler };
+    this.consumers.push(consumer);
+    await this.startConsumer(consumer);
+  }
+
+  private async startConsumer({ queue, prefetch, handler }: Consumer): Promise<void> {
+    const channel = await this.connection!.createChannel();
+    await channel.assertQueue(queue, { durable: true });
+    await channel.prefetch(prefetch);
+
+    await channel.consume(queue, async (message) => {
+      if (!message) return; // consumer cancelled by the server
+
+      let payload: unknown;
+      try {
+        payload = JSON.parse(message.content.toString());
+      } catch {
+        console.error(`Discarding malformed message on "${queue}".`);
+        channel.ack(message);
+        return;
+      }
+
+      try {
+        await handler(payload);
+        channel.ack(message);
+      } catch (err: any) {
+        console.error(`Handler failed on "${queue}", requeueing:`, err?.message || err);
+        setTimeout(() => {
+          try {
+            channel.nack(message, false, true);
+          } catch {
+            // Channel already closed: RabbitMQ redelivers unacknowledged messages by itself.
+          }
+        }, REQUEUE_DELAY_MS);
+      }
+    }, { noAck: false });
+
+    console.log(`Consuming "${queue}" (prefetch ${prefetch}).`);
   }
 
   /** Publishes a persistent JSON message and waits for RabbitMQ to confirm it. */
@@ -72,7 +135,6 @@ class RabbitMQClass {
 
   public async close(): Promise<void> {
     this.closing = true;
-    await this.channel?.close().catch(() => undefined);
     await this.connection?.close().catch(() => undefined);
   }
 }
