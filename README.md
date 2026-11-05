@@ -125,6 +125,22 @@ replaced. Returns the updated job. `404` as above.
 ### DELETE /api/v1/recruiter/jobs/:id  (protected)
 Deletes the job and its requirements. Returns `{ id }`. `404` as above.
 
+### POST /api/v1/recruiter/jobs/:id/cvs  (protected, multipart/form-data)
+Upload CVs for a job in the form-data field **`files`** (repeat the field per file).
+Up to `CV_MAX_FILES` (15) files per request, each ≤ `CV_MAX_FILE_SIZE_MB` (5 MB), PDF or DOCX only.
+
+For each valid file the API stores it at `UPLOAD_DIR/cvs/<jobId>/<uuid>.<ext>`, creates a candidate with
+status `queued`, and publishes `{ candidateId, jobId, queuedAt }` to the RabbitMQ queue `cv_processing`
+(persistent message, publisher-confirmed). Files are checked by content (PDF must start with `%PDF`,
+DOCX must be a ZIP), not only by extension.
+
+Unsupported files are skipped and listed in `rejected`; the rest are still accepted. `201` response:
+`{ jobId, uploaded, queued, candidates: [{ id, jobId, fileName, fileType, fileSizeKb, cvUrl, status, uploadedAt, matchScore }], rejected: [{ fileName, reason }] }`.
+Errors: `400` no valid files / too many files / file too large / wrong field name / not form-data,
+`401` not logged in, `404` job not found or not yours. A CV that can't be queued is saved with status `failed`.
+
+Deleting a job also deletes its candidates and their uploaded files.
+
 All job routes are also served under `/api/v1/jobs`.
 
 ### GET /api/v1/_health

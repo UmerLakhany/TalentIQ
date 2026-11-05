@@ -4,6 +4,7 @@ import express, { Express } from 'express';
 import cors from 'cors';
 import SequelizeClass from '../settings/orm/sequelize';
 import RedisClass from '../settings/cache/redis';
+import RabbitMQClass from '../settings/queue/rabbitmq';
 import emailService from './services/email.service';
 import './models';
 import v1Routes from './routes/v1';
@@ -32,6 +33,7 @@ const start = async () => {
   try {
     await SequelizeClass.getInstance().connect();
     await RedisClass.getInstance().connect();
+    await RabbitMQClass.getInstance().connect();
     emailService.verifyConnection(); // logs only; a mail problem shouldn't stop the API
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}/api/v1`);

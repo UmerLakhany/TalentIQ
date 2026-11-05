@@ -1,5 +1,7 @@
-import { Request, Response } from 'express';
+import fs from 'fs';
+import { NextFunction, Request, Response } from 'express';
 import asyncHandler from '../common/asyncHandler';
+import { jobUploadDir } from '../common/cvUpload';
 import { isUUID } from 'class-validator';
 import JobRepository, { JobSort } from '../repositories/job.repository';
 import CreateJobDTO from '../dto/classes/CreateJob.dto';
@@ -100,6 +102,17 @@ const loadOwnJob = async (req: Request, res: Response): Promise<Job | null> => {
 };
 
 class JobService {
+  /**
+   * Middleware: loads :id for the logged-in recruiter into res.locals.job, or responds 404.
+   * Used before file uploads so nothing is stored for a job the recruiter doesn't own.
+   */
+  static requireOwnJob = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const job = await loadOwnJob(req, res);
+    if (!job) return;
+    res.locals.job = job;
+    next();
+  });
+
   /** POST /api/v1/recruiter/jobs (also served at /api/v1/jobs for the recruiter panel) */
   static createJob = asyncHandler(async (req: Request, res: Response) => {
     const body = req.body as CreateJobDTO;
@@ -174,6 +187,10 @@ class JobService {
     if (!job) return;
 
     await JobRepository.delete(job);
+    // Candidates are removed by the database cascade; remove their uploaded CV files too.
+    await fs.promises
+      .rm(jobUploadDir(job.id), { recursive: true, force: true })
+      .catch((err) => console.error(`Failed to remove uploads for job ${job.id}:`, err?.message || err));
 
     return res.generalResponse('Job deleted successfully.', { id: job.id }, 200);
   });
