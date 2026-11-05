@@ -1,3 +1,4 @@
+import 'reflect-metadata'; // must load first: used by class-transformer decorators in DTOs
 import 'dotenv/config';
 import express, { Express } from 'express';
 import cors from 'cors';

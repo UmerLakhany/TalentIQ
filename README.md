@@ -81,6 +81,52 @@ Also served at `POST /api/v1/auth/login`, the path the recruiter panel calls.
 and updates `last_login_at`.
 Errors: `400` validation, `401` wrong email or password (same message for both), `403` account deactivated.
 
+### Authentication for protected routes
+Send `Authorization: Bearer <access_token>` (from login or verify-email). Missing, invalid or expired
+tokens, and tokens of deleted / deactivated / unverified accounts get `401`.
+
+### POST /api/v1/recruiter/jobs  (protected)
+Also served at `POST /api/v1/jobs`, the path the recruiter panel uses. Body mirrors the panel's job form:
+```json
+{
+  "title": "Full-Stack Developer",
+  "description": "Build and scale our recruitment platform end-to-end.",
+  "minExperience": 3,
+  "experienceType": "mandatory",
+  "skills": [
+    { "name": "Node.js", "type": "mandatory" },
+    { "name": "React.js or Next.js", "type": "preferred" },
+    { "name": "Python", "type": "not_required" }
+  ],
+  "education": { "name": "Bachelor's degree in Computer Science", "type": "preferred" },
+  "otherRequirements": [{ "name": "Experience building scalable applications", "type": "preferred" }]
+}
+```
+Rules: `title` 3–150 chars; `description` ≤ 500; `minExperience` whole number 0–40; `experienceType`,
+`education.type`, `otherRequirements[].type` are `mandatory` | `preferred`; `skills` 1–50 items with type
+`mandatory` | `preferred` | `not_required`, no duplicate names; `education` and `otherRequirements` optional.
+
+`201 Created` returns the job with its requirements as a flat list (experience, skills, education, other):
+`{ id, title, description, minExperience, requirements: [{ id, category, name, type }], createdAt }`.
+An experience requirement is generated when `minExperience > 0`.
+
+### GET /api/v1/recruiter/jobs  (protected)
+Lists the logged-in recruiter's jobs. Query (all optional): `page` (default 1), `limit` (default 10, max 100),
+`search` (title contains, case-insensitive), `sort` = `newest` (default) | `oldest` | `title_asc` | `title_desc`.
+Returns `{ jobs: [...], pagination: { page, limit, total, totalPages } }`.
+
+### GET /api/v1/recruiter/jobs/:id  (protected)
+Returns one job. `404` if it doesn't exist or belongs to another recruiter.
+
+### PUT /api/v1/recruiter/jobs/:id  (protected)
+Full update: same body and rules as create (plus optional `reanalyze` boolean). The requirement list is
+replaced. Returns the updated job. `404` as above.
+
+### DELETE /api/v1/recruiter/jobs/:id  (protected)
+Deletes the job and its requirements. Returns `{ id }`. `404` as above.
+
+All job routes are also served under `/api/v1/jobs`.
+
 ### GET /api/v1/_health
 Health check.
 

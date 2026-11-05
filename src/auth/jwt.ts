@@ -1,60 +1,54 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import { Recruiter } from '../models';
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: 'admin' | 'recruiter';
+}
 
 declare module 'express-serve-static-core' {
   interface Request {
-    user?: any;
+    user?: AuthUser;
   }
 }
 
 class AuthMiddleware {
 
+  /**
+   * Requires `Authorization: Bearer <token>`. Also checks the recruiter still exists and is
+   * active, so a deleted or deactivated account can't keep using an old token.
+   */
   static async auth(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
+    const header = req.headers.authorization;
+    const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : '';
 
-      let token = '';
-
-      if (req?.headers?.authorization?.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1].trim()
-      }
-
-      if (!token) {
-        return res.generalError("Authentication required", { error: 'Authentication required' }, 401);
-      }
-
-
-      const decoded: any = jwt.verify(token, process.env.JWT_SECRET || '')
-
-      req.user = decoded;
-      next();
-    } catch (err: any) {
-      res.generalError("Authentication required", { error: err?.message || 'Authentication required' }, 401);
-    }
-  }
-
-  static authAdmin(req: Request, res: Response, next: NextFunction): void {
-    const token = req?.headers?.token || req?.cookies?.token;
     if (!token) {
-      res.generalError("Authentication required", { error: 'Authentication required' }, 401);
+      return res.generalError('Authentication required.', {}, 401);
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || '', (err: any, user: any) => {
-      if (err) {
-        return res.status(401).json({ error: 'Token verification failed', detail: err });
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || '');
+    } catch (err: any) {
+      const message = err?.name === 'TokenExpiredError'
+        ? 'Your session has expired. Please log in again.'
+        : 'Invalid token. Please log in again.';
+      return res.generalError(message, {}, 401);
+    }
+
+    try {
+      const recruiter = decoded?.id ? await Recruiter.findByPk(decoded.id) : null;
+      if (!recruiter || !recruiter.isActive || !recruiter.isEmailVerified) {
+        return res.generalError('Your account is not allowed to access this resource.', {}, 401);
       }
 
-      const jwtSecret = AuthMiddleware.createJwt({
-        id: user.id,
-        email: user.email
-      })
-
-
-      delete user.password
-
-      req.user = user;
+      req.user = { id: recruiter.id, email: recruiter.email, role: recruiter.role };
       next();
-    });
+    } catch (err) {
+      next(err);
+    }
   }
 
   static createJwt(payload: Record<string, any>, period: 'short' | 'defined' = 'defined', expiresIn?: string): string {
