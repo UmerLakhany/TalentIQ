@@ -19,6 +19,22 @@
     "subject": "Account Rejected",
     "template": "<p>Dear {{name}}, your account has been rejected for the following reason: {{rejectionReason}}</p>"
   },
+  "emailVerificationOtp": {
+    "subject": "Your TalentIQ verification code",
+    "template": "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937\"><h2 style=\"margin:0 0 16px;color:#111827\">Verify your email</h2><p style=\"margin:0 0 16px\">Hi {{name}},</p><p style=\"margin:0 0 16px\">Use this code to verify your TalentIQ account:</p><p style=\"margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:8px;color:#4f46e5\">{{otp}}</p><p style=\"margin:0 0 16px\">The code expires in {{expiryMinutes}} minutes.</p><p style=\"margin:0;font-size:13px;color:#6b7280\">If you didn't create a TalentIQ account, you can ignore this email.</p></div>"
+  },
+  "emailVerified": {
+    "subject": "Welcome to TalentIQ!",
+    "template": "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937\"><h2 style=\"margin:0 0 16px;color:#111827\">Welcome to TalentIQ</h2><p style=\"margin:0 0 16px\">Hi {{name}},</p><p style=\"margin:0\">Your email has been verified. You can now sign in and start screening candidates.</p></div>"
+  },
+  "passwordResetOtp": {
+    "subject": "Your TalentIQ password reset code",
+    "template": "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937\"><h2 style=\"margin:0 0 16px;color:#111827\">Reset your password</h2><p style=\"margin:0 0 16px\">Hi {{name}},</p><p style=\"margin:0 0 16px\">Use this code to reset your TalentIQ password:</p><p style=\"margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:8px;color:#4f46e5\">{{otp}}</p><p style=\"margin:0 0 16px\">The code expires in {{expiryMinutes}} minutes.</p><p style=\"margin:0;font-size:13px;color:#6b7280\">If you didn't request a password reset, you can ignore this email. Your password won't change.</p></div>"
+  },
+  "passwordChanged": {
+    "subject": "Your TalentIQ password was changed",
+    "template": "<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2937\"><h2 style=\"margin:0 0 16px;color:#111827\">Password changed</h2><p style=\"margin:0 0 16px\">Hi {{name}},</p><p style=\"margin:0 0 16px\">Your TalentIQ password was just changed. You can now sign in with your new password.</p><p style=\"margin:0;font-size:13px;color:#6b7280\">If you didn't make this change, reset your password immediately and contact your workspace administrator.</p></div>"
+  },
   "verifyEmail": {
     "subject": "Verify Your Email Address",
     "template": "<p>Hello {{name}},</p><p>Please verify your email address by clicking <a href='{{verifyLink}}'>here</a>. This link will expire in 24 hours.</p>"

@@ -11,6 +11,7 @@ class Recruiter extends Model<RecruiterAttributes, RecruiterCreationAttributes> 
   declare password: string;
   declare role: RecruiterAttributes['role'];
   declare isActive: boolean;
+  declare isEmailVerified: boolean;
   declare lastLoginAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -44,6 +45,11 @@ Recruiter.init({
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: true,
+  },
+  isEmailVerified: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
   },
   lastLoginAt: {
     type: DataTypes.DATE,

@@ -18,6 +18,22 @@ class RecruiterRepository {
   static async findById(id: string): Promise<Recruiter | null> {
     return Recruiter.findByPk(id);
   }
+
+  static async markEmailVerified(recruiter: Recruiter): Promise<Recruiter> {
+    return recruiter.update({ isEmailVerified: true, lastLoginAt: new Date() });
+  }
+
+  /**
+   * Sets a new password hash. Receiving the reset code also proves the recruiter owns the
+   * email, so the email is marked verified as well.
+   */
+  static async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await Recruiter.update({ password: passwordHash, isEmailVerified: true }, { where: { id } });
+  }
+
+  static async updateLastLogin(recruiter: Recruiter): Promise<Recruiter> {
+    return recruiter.update({ lastLoginAt: new Date() });
+  }
 }
 
 export default RecruiterRepository;

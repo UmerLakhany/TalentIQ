@@ -7,6 +7,7 @@ export interface RecruiterAttributes {
   password: string;
   role: RecruiterRole;
   isActive: boolean;
+  isEmailVerified: boolean;
   lastLoginAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;

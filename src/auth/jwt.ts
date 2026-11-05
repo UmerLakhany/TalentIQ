@@ -57,12 +57,12 @@ class AuthMiddleware {
     });
   }
 
-  static createJwt(payload: Record<string, any>, period: 'short' | 'defined' = 'defined'): string {
+  static createJwt(payload: Record<string, any>, period: 'short' | 'defined' = 'defined', expiresIn?: string): string {
     const secret = process.env.JWT_SECRET;
     if (!secret) throw new Error('JWT_SECRET not defined');
 
     const defaultExpiry = '1h';
-    const expiry = period === 'short' ? '600s' : process.env.JWT_EXPIRY || defaultExpiry;
+    const expiry = expiresIn || (period === 'short' ? '600s' : process.env.JWT_EXPIRY || defaultExpiry);
 
     const options: jwt.SignOptions | any = expiry
       ? { expiresIn: expiry }
