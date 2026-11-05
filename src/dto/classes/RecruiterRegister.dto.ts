@@ -1,4 +1,5 @@
 import { IsEmail, IsNotEmpty, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, PASSWORD_REGEX, PASSWORD_RULE_MESSAGE } from '../../common/passwordPolicy';
 
 /** Body of POST /api/v1/recruiter/auth/register (snake_case, matching the recruiter panel). */
 export default class RecruiterRegisterDTO {
@@ -15,9 +16,8 @@ export default class RecruiterRegisterDTO {
 
   @IsNotEmpty({ message: 'Password is required.' })
   @IsString({ message: 'Password must be a string.' })
-  @MinLength(8, { message: 'Password must be at least 8 characters.' })
-  // bcrypt only uses the first 72 bytes of a password.
-  @MaxLength(72, { message: 'Password must be at most 72 characters.' })
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Password must contain at least one letter and one number.' })
+  @MinLength(PASSWORD_MIN_LENGTH, { message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
+  @MaxLength(PASSWORD_MAX_LENGTH, { message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters.` })
+  @Matches(PASSWORD_REGEX, { message: `Password ${PASSWORD_RULE_MESSAGE}` })
   password!: string;
 }

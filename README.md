@@ -52,7 +52,7 @@ Don't run the Docker `api` service and `npm run dev` on the same port at the sam
 ```json
 { "full_name": "Jane Recruiter", "email": "jane@company.com", "password": "Secret123" }
 ```
-Rules: `full_name` 2–100 chars, valid `email`, `password` 8–72 chars with at least one letter and one number.
+Rules: `full_name` 2–100 chars, valid `email`, `password` 8–72 chars with an uppercase letter, a lowercase letter, a number and a special character (`_ ~ = @ # $ > . < , [ { } ( ) ! % | ' " ` : ; + * ? &`).
 Unknown fields (e.g. `role`) are ignored; new accounts always get the `recruiter` role.
 
 `201 Created` (a verification code is emailed; no token until the email is verified):
