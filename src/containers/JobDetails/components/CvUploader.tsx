@@ -17,7 +17,11 @@ interface SelectedFile {
 interface CvUploaderProps {
   /** File names already uploaded for this job (duplicate check) */
   existingFileNames: string[];
-  onUpload: (files: { file: File; type: CvFileType }[]) => void;
+  /**
+   * Uploads the files. Resolves with the files the server refused (with the reason), or null if
+   * the upload failed as a whole (the selection is then kept so the user can try again).
+   */
+  onUpload: (files: { file: File; type: CvFileType }[]) => Promise<{ fileName: string; reason: string }[] | null>;
 }
 
 const fileTypeOf = (name: string): CvFileType | null => {
@@ -30,9 +34,10 @@ const fileTypeOf = (name: string): CvFileType | null => {
 export default function CvUploader({ existingFileNames, onUpload }: CvUploaderProps) {
   const [selected, setSelected] = useState<SelectedFile[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const addFiles = (incoming: FileList | null) => {
-    if (!incoming?.length) return;
+    if (!incoming?.length || uploading) return;
     setSelected((prev) => {
       const next = [...prev];
       for (const file of Array.from(incoming)) {
@@ -62,9 +67,22 @@ export default function CvUploader({ existingFileNames, onUpload }: CvUploaderPr
   const valid = selected.filter((f) => !f.error);
   const invalidCount = selected.length - valid.length;
 
-  const handleUpload = () => {
-    onUpload(valid.map((f) => ({ file: f.file, type: f.type as CvFileType })));
-    setSelected([]);
+  const handleUpload = async () => {
+    setUploading(true);
+    try {
+      const rejected = await onUpload(valid.map((f) => ({ file: f.file, type: f.type as CvFileType })));
+      if (rejected === null) return; // request failed: keep the selection to try again
+
+      // Accepted files leave the list; files the server refused stay, showing its reason
+      const reasonByName = new Map(rejected.map((r) => [r.fileName, r.reason]));
+      setSelected((prev) =>
+        prev
+          .filter((f) => reasonByName.has(f.file.name))
+          .map((f) => ({ ...f, error: `Rejected by server: ${reasonByName.get(f.file.name)}` }))
+      );
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -145,6 +163,7 @@ export default function CvUploader({ existingFileNames, onUpload }: CvUploaderPr
                     type="button"
                     className="btn hf-icon-btn rounded-3 flex-shrink-0"
                     onClick={() => setSelected((prev) => prev.filter((f) => f.id !== item.id))}
+                    disabled={uploading}
                     aria-label={`Remove ${item.file.name}`}
                   >
                     <i className="bi bi-x-lg" />
@@ -159,12 +178,26 @@ export default function CvUploader({ existingFileNames, onUpload }: CvUploaderPr
                 {invalidCount > 0 && <span className="text-danger"> · {invalidCount} invalid (will be skipped)</span>}
               </div>
               <div className="d-flex gap-2">
-                <button type="button" className="btn btn-light border flex-grow-1" onClick={() => setSelected([])}>
+                <button type="button" className="btn btn-light border flex-grow-1" onClick={() => setSelected([])} disabled={uploading}>
                   Clear
                 </button>
-                <button type="button" className="btn btn-primary flex-grow-1 text-nowrap" onClick={handleUpload} disabled={valid.length === 0}>
-                  <i className="bi bi-stars me-1" aria-hidden="true" />
-                  Upload &amp; Analyze ({valid.length})
+                <button
+                  type="button"
+                  className="btn btn-primary flex-grow-1 text-nowrap"
+                  onClick={handleUpload}
+                  disabled={valid.length === 0 || uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                      Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-stars me-1" aria-hidden="true" />
+                      Upload &amp; Analyze ({valid.length})
+                    </>
+                  )}
                 </button>
               </div>
             </div>

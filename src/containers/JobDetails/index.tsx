@@ -1,22 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { SuccessToaster } from "@/components/Toaster";
+import { useEffect, useState } from "react";
+import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import PageHeader from "@/core/comman/PageHeader";
 import StatCard from "@/core/comman/StatCard";
 import type { Candidate, CvFileType } from "@/data/candidates";
 import type { Job } from "@/data/jobs";
+import { getJobCandidates, uploadCvs } from "@/services/candidateService";
 import { formatDate } from "@/utils/format";
 import CandidateRanking from "./components/CandidateRanking";
 import CriteriaSummary from "./components/CriteriaSummary";
 import CvUploader from "./components/CvUploader";
+
+/** How often to check for status changes while CVs are being analyzed. */
+const STATUS_POLL_MS = 5000;
 
 interface JobDetailsProps {
   job: Job;
   initialCandidates: Candidate[];
 }
 
+/**
+ * CV workflow on this page:
+ *   1. Recruiter uploads CVs          → POST /jobs/:id/cvs (stored, one RabbitMQ job per CV, status "queued")
+ *   2. Background worker + AI analysis (backend) → status "processing" → "completed" / "failed"
+ *   3. This page re-reads GET /jobs/:id/candidates every few seconds while any CV is queued or
+ *      processing, so statuses, scores and the ranking update without a reload.
+ */
 export default function JobDetails({ job, initialCandidates }: JobDetailsProps) {
   const [candidates, setCandidates] = useState<Candidate[]>(initialCandidates);
 
@@ -26,32 +37,48 @@ export default function JobDetails({ job, initialCandidates }: JobDetailsProps) 
     inProgress: candidates.filter((c) => c.status === "queued" || c.status === "processing").length,
     failed: candidates.filter((c) => c.status === "failed").length,
   };
+  const analysisRunning = stats.inProgress > 0;
 
-  /**
-   * Static stand-in for POST /jobs/:id/cvs: the API stores the files, queues one
-   * RabbitMQ job per CV and answers immediately. New rows start as "Queued";
-   * here we only simulate the worker picking them up.
-   */
-  const handleUpload = (files: { file: File; type: CvFileType }[]) => {
-    const batchId = Date.now();
-    const newRows: Candidate[] = files.map(({ file, type }, index) => ({
-      id: `upload-${batchId}-${index}`,
-      jobId: job.id,
-      fileName: file.name,
-      fileType: type,
-      fileSizeKb: file.size / 1024,
-      cvUrl: "",
-      status: "queued",
-      uploadedAt: new Date().toISOString(),
-    }));
-    const ids = new Set(newRows.map((row) => row.id));
+  // *For Live Status — poll while the worker still has CVs of this job to analyze
+  useEffect(() => {
+    if (!analysisRunning) return;
+    let cancelled = false;
 
-    setCandidates((prev) => [...prev, ...newRows]);
-    SuccessToaster(`${files.length} CV${files.length > 1 ? "s" : ""} uploaded and queued for AI analysis.`);
+    const timer = setTimeout(() => {
+      getJobCandidates(job.id)
+        .then(({ data }) => {
+          if (!cancelled) setCandidates(data.candidates);
+        })
+        .catch(() => {
+          // Temporary network problem: keep the current list and try again in STATUS_POLL_MS
+          // (a new array re-runs this effect). A 401 is handled by clientApi (back to login).
+          if (!cancelled) setCandidates((prev) => [...prev]);
+        });
+    }, STATUS_POLL_MS);
 
-    setTimeout(() => {
-      setCandidates((prev) => prev.map((c) => (ids.has(c.id) && c.status === "queued" ? { ...c, status: "processing" } : c)));
-    }, 2500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [analysisRunning, candidates, job.id]);
+
+  // *For Upload CVs (POST /jobs/:id/cvs)
+  const handleUpload = async (files: { file: File; type: CvFileType }[]) => {
+    try {
+      const { message, data } = await uploadCvs(job.id, files.map(({ file }) => file));
+
+      // New CVs come back as "queued"; the polling above follows them until they are analyzed
+      setCandidates((prev) => [...prev, ...data.candidates]);
+      if (data.rejected.length > 0) {
+        ErrorToaster(`${message} ${data.rejected.length} file(s) were rejected — see the list for the reason.`);
+      } else {
+        SuccessToaster(message);
+      }
+      return data.rejected;
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+      return null;
+    }
   };
 
   return (

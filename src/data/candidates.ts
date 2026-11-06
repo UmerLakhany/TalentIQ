@@ -53,7 +53,7 @@ export interface Candidate {
   fileName: string;
   fileType: CvFileType;
   fileSizeKb: number;
-  /** Original CV file (static sample until the API serves real files) */
+  /** Original CV file (from the API: a signed link valid for 60 minutes) */
   cvUrl: string;
   status: ProcessingStatus;
   errorMessage?: string;
@@ -61,6 +61,12 @@ export interface Candidate {
   uploadedAt: string;
   profile?: CandidateProfile;
   evaluation?: CandidateEvaluation;
+  /** From the API: score calculated by the backend (null until analyzed) */
+  matchScore?: number | null;
+  /** From the API: position by score among analyzed CVs of the job (1 = best) */
+  rank?: number | null;
+  /** From the API: ISO date-time the analysis finished */
+  processedAt?: string | null;
 }
 
 export const PROCESSING_STATUS_LABELS: Record<ProcessingStatus, string> = {
