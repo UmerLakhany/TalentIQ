@@ -63,6 +63,7 @@ body {
 
 /* iOS zooms into inputs smaller than 16px — use 16px on phones & tablets */
 @media (max-width: 767.98px) {
+
   .form-control,
   .form-select {
     font-size: 1rem;
@@ -126,11 +127,11 @@ body {
 }
 
 /* Data tables: roomier cells, small uppercase headings */
-.hf-table > :not(caption) > * > * {
+.hf-table> :not(caption)>*>* {
   padding: 0.875rem 1rem;
 }
 
-.hf-table > thead th {
+.hf-table>thead th {
   background-color: var(--hf-bg);
   color: var(--hf-text-muted);
   font-size: 0.75rem;
@@ -207,7 +208,7 @@ body {
   background-color: var(--hf-primary-soft);
 }
 
-#cv-input:focus-visible + .hf-dropzone {
+#cv-input:focus-visible+.hf-dropzone {
   outline: 2px solid var(--hf-primary);
   outline-offset: 2px;
 }
@@ -253,6 +254,20 @@ body {
   justify-content: center;
   font-size: 1.15rem;
   color: var(--hf-text-muted);
+}
+
+/* Hamburger / sidebar toggle: larger, bordered tap target */
+.hf-menu-btn {
+  width: 34px;
+  height: 34px;
+  font-size: 1.3rem;
+  color: var(--hf-text);
+  border: 1px solid var(--hf-border);
+  background-color: #fff;
+}
+
+.hf-menu-btn:active {
+  border-color: var(--hf-border);
 }
 
 .hf-icon-btn:hover,
@@ -347,8 +362,8 @@ body {
   flex-shrink: 0;
 }
 
-/* Tooltip shown beside an icon when the sidebar is collapsed (desktop only) */
 .hf-sidebar-tooltip {
+  position: absolute;
   display: none;
   left: 100%;
   top: 50%;
@@ -359,6 +374,9 @@ body {
 }
 
 .hf-sidebar-tooltip .tooltip-arrow {
+  position: absolute;
+  /* also dropped from the bundled Bootstrap rule */
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -378,8 +396,10 @@ body {
     width: var(--hf-sidebar-collapsed-width);
   }
 
+  /* !important beats Bootstrap's `overflow-y-auto`, so the hover tooltip
+     can extend past the sidebar instead of adding a scrollbar. */
   .hf-sidebar.is-collapsed .hf-sidebar-nav {
-    overflow: visible;
+    overflow: visible !important;
   }
 
   .hf-sidebar.is-collapsed .hf-sidebar-label {
@@ -451,7 +471,7 @@ body {
   pointer-events: none;
 }
 
-.hf-auth-aside > * {
+.hf-auth-aside>* {
   position: relative;
 }
 
