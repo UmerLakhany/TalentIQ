@@ -7,13 +7,17 @@ import { logoutUser } from "@/services/authService";
 import { buildBreadcrumbs } from "@/utils/breadcrumbs";
 
 interface HeaderProps {
+  /** Desktop: the sidebar is collapsed to icons */
+  sidebarCollapsed: boolean;
+  /** Phones & tablets: the sidebar drawer is open */
+  mobileSidebarOpen: boolean;
   /** Desktop: collapse / expand the sidebar */
   onToggleSidebar: () => void;
   /** Phones & tablets: open the sidebar drawer */
   onOpenMobileSidebar: () => void;
 }
 
-export default function Header({ onToggleSidebar, onOpenMobileSidebar }: HeaderProps) {
+export default function Header({ sidebarCollapsed, mobileSidebarOpen, onToggleSidebar, onOpenMobileSidebar }: HeaderProps) {
   const pathname = usePathname();
   const crumbs = buildBreadcrumbs(pathname);
   const pageTitle = crumbs[crumbs.length - 1]?.label ?? "Jobs";
@@ -33,22 +37,28 @@ export default function Header({ onToggleSidebar, onOpenMobileSidebar }: HeaderP
   return (
     <header className="sticky-top bg-white border-bottom">
       <div className="hf-header d-flex align-items-center gap-2 gap-md-3 px-3 px-lg-4">
+        {/* Phones & tablets: hamburger opens the sidebar drawer */}
         <button
           type="button"
-          className="btn hf-icon-btn rounded-3 d-lg-none"
+          className="btn hf-icon-btn hf-menu-btn rounded-3 d-lg-none"
           onClick={onOpenMobileSidebar}
           aria-label="Open navigation"
+          aria-controls="app-sidebar"
+          aria-expanded={mobileSidebarOpen}
         >
-          <i className="bi bi-list" />
+          <i className="bi bi-list" aria-hidden="true" />
         </button>
+        {/* Desktop: collapse the sidebar to icons / expand it again */}
         <button
           type="button"
-          className="btn hf-icon-btn rounded-3 d-none d-lg-inline-flex"
+          className="btn hf-icon-btn hf-menu-btn rounded-3 d-none d-lg-inline-flex"
           onClick={onToggleSidebar}
-          aria-label="Collapse or expand sidebar"
-          title="Collapse / expand sidebar"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-controls="app-sidebar"
+          aria-expanded={!sidebarCollapsed}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <i className="bi bi-layout-sidebar" />
+          <i className={`bi ${sidebarCollapsed ? "bi-layout-sidebar-inset" : "bi-layout-sidebar"}`} aria-hidden="true" />
         </button>
 
         <div className="flex-grow-1 min-w-0">

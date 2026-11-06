@@ -44,6 +44,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <div className={`hf-content d-flex flex-column min-vh-100 ${collapsed ? "is-collapsed" : ""}`}>
         <Header
+          sidebarCollapsed={collapsed}
+          mobileSidebarOpen={mobileOpen}
           onToggleSidebar={() => setCollapsed((value) => !value)}
           onOpenMobileSidebar={() => setMobileOpen(true)}
         />

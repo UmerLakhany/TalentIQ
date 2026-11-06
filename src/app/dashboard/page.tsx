@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Dashboard from "@/containers/Dashboard";
-import { mockCandidates } from "@/data/candidates";
-import { mockJobs } from "@/data/jobs";
+import { getDashboardForPage } from "@/services/server/dashboardService";
 
 export const metadata: Metadata = { title: "Dashboard | HireFlow AI" };
 
-export default function DashboardPage() {
-  return <Dashboard jobs={mockJobs} candidates={mockCandidates} />;
+export default async function DashboardPage() {
+  const data = await getDashboardForPage();
+  if (!data) throw new Error("The dashboard could not be loaded.");
+
+  return <Dashboard data={data} />;
 }

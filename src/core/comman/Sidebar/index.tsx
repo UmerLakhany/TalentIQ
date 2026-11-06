@@ -21,6 +21,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
       {mobileOpen && <div className="offcanvas-backdrop fade show d-lg-none" onClick={onCloseMobile} />}
 
       <aside
+        id="app-sidebar"
         className={`hf-sidebar bg-white border-end d-flex flex-column ${collapsed ? "is-collapsed" : ""} ${
           mobileOpen ? "is-open" : ""
         }`}
@@ -37,11 +38,11 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
           </div>
           <button
             type="button"
-            className="btn hf-icon-btn rounded-3 d-lg-none"
+            className="btn hf-icon-btn hf-menu-btn rounded-3 d-lg-none"
             onClick={onCloseMobile}
             aria-label="Close navigation"
           >
-            <i className="bi bi-x-lg" />
+            <i className="bi bi-x-lg" aria-hidden="true" />
           </button>
         </div>
 
