@@ -92,6 +92,8 @@ const buildDashboard = async (recruiterId: string) => {
         id: job.id,
         title: job.title,
         createdAt: job.createdAt.toISOString().slice(0, 10),
+        mandatory: (job.requirements ?? []).filter((r) => r.type === 'mandatory').length,
+        preferred: (job.requirements ?? []).filter((r) => r.type === 'preferred').length,
         totalCvs: jobCvs.length,
         analyzed: jobAnalyzed.length,
         inProgress: byStatus('queued', jobCvs).length + byStatus('processing', jobCvs).length,
