@@ -29,6 +29,29 @@ export const toJobResponse = (job: Job) => ({
   createdAt: job.createdAt.toISOString().slice(0, 10), // YYYY-MM-DD
 });
 
+/** CV processing counts of a job (shown as "CV Analysis" progress in the recruiter panel). */
+export interface JobCvSummary {
+  totalCvs: number;
+  analyzed: number;
+  inProgress: number;
+  failed: number;
+}
+
+/** Adds `cvSummary` to each job, using one grouped query for all of them. */
+const withCvSummaries = async (jobs: Job[]) => {
+  const counts = await CandidateRepository.countByStatusForJobs(jobs.map((job) => job.id));
+  return jobs.map((job) => {
+    const c = counts[job.id] ?? {};
+    const cvSummary: JobCvSummary = {
+      totalCvs: (c.queued ?? 0) + (c.processing ?? 0) + (c.completed ?? 0) + (c.failed ?? 0),
+      analyzed: c.completed ?? 0,
+      inProgress: (c.queued ?? 0) + (c.processing ?? 0),
+      failed: c.failed ?? 0,
+    };
+    return { ...toJobResponse(job), cvSummary };
+  });
+};
+
 /**
  * Turns the form fields into the stored requirement list, in display order:
  * experience, skills, education, other.
@@ -152,7 +175,7 @@ class JobService {
     });
 
     return res.generalResponse('Jobs fetched successfully.', {
-      jobs: rows.map(toJobResponse),
+      jobs: await withCvSummaries(rows),
       pagination: {
         page,
         limit,
@@ -167,7 +190,8 @@ class JobService {
     const job = await loadOwnJob(req, res);
     if (!job) return;
 
-    return res.generalResponse('Job fetched successfully.', toJobResponse(job), 200);
+    const [withSummary] = await withCvSummaries([job]);
+    return res.generalResponse('Job fetched successfully.', withSummary, 200);
   });
 
   /**
@@ -211,7 +235,8 @@ class JobService {
     const message = reanalysis.requeued > 0
       ? `Job updated successfully. ${reanalysis.requeued} CV(s) queued for re-analysis.`
       : 'Job updated successfully.';
-    return res.generalResponse(message, { ...toJobResponse(updated), reanalysis }, 200);
+    const [updatedWithSummary] = await withCvSummaries([updated]);
+    return res.generalResponse(message, { ...updatedWithSummary, reanalysis }, 200);
   });
 
   /** DELETE /api/v1/recruiter/jobs/:id (also deletes its requirements) */

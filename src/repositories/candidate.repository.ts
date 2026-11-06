@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, col, fn } from 'sequelize';
 import { Candidate, Job, JobRequirement } from '../models';
 import { CandidateCreationAttributes, ProcessingStatus } from '../models/interfaces';
 
@@ -16,6 +16,23 @@ class CandidateRepository {
 
   static async markFailed(candidate: Candidate, errorMessage: string): Promise<Candidate> {
     return candidate.update({ status: 'failed', errorMessage });
+  }
+
+  /** Number of CVs per job and status, in one query: { [jobId]: { queued: 2, completed: 5, ... } }. */
+  static async countByStatusForJobs(jobIds: string[]): Promise<Record<string, Partial<Record<ProcessingStatus, number>>>> {
+    if (jobIds.length === 0) return {};
+    const rows = (await Candidate.findAll({
+      attributes: ['jobId', 'status', [fn('COUNT', col('id')), 'count']],
+      where: { jobId: jobIds },
+      group: ['jobId', 'status'],
+      raw: true,
+    })) as unknown as { jobId: string; status: ProcessingStatus; count: string }[];
+
+    const result: Record<string, Partial<Record<ProcessingStatus, number>>> = {};
+    for (const row of rows) {
+      result[row.jobId] = { ...result[row.jobId], [row.status]: Number(row.count) };
+    }
+    return result;
   }
 
   static async findAllForJob(jobId: string, status?: ProcessingStatus): Promise<Candidate[]> {
