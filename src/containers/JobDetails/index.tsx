@@ -7,7 +7,8 @@ import PageHeader from "@/core/comman/PageHeader";
 import StatCard from "@/core/comman/StatCard";
 import type { Candidate, CvFileType } from "@/data/candidates";
 import type { Job } from "@/data/jobs";
-import { getJobCandidates, uploadCvs } from "@/services/candidateService";
+import ConfirmDialog from "@/core/modals/ConfirmDialog";
+import { deleteCandidate, getJobCandidates, retryCandidate, uploadCvs } from "@/services/candidateService";
 import { formatDate } from "@/utils/format";
 import CandidateRanking from "./components/CandidateRanking";
 import CriteriaSummary from "./components/CriteriaSummary";
@@ -30,6 +31,9 @@ interface JobDetailsProps {
  */
 export default function JobDetails({ job, initialCandidates }: JobDetailsProps) {
   const [candidates, setCandidates] = useState<Candidate[]>(initialCandidates);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [candidateToDelete, setCandidateToDelete] = useState<Candidate | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const stats = {
     total: candidates.length,
@@ -81,6 +85,37 @@ export default function JobDetails({ job, initialCandidates }: JobDetailsProps) 
     }
   };
 
+  // *For Retry Failed CV (POST /candidates/:id/retry)
+  const handleRetry = async (candidate: Candidate) => {
+    setRetryingId(candidate.id);
+    try {
+      const { message, data } = await retryCandidate(candidate.id);
+      // Back to "queued": the polling above follows it again until analyzed
+      setCandidates((prev) => prev.map((c) => (c.id === candidate.id ? data : c)));
+      SuccessToaster(message);
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  // *For Delete CV (DELETE /candidates/:id)
+  const confirmDelete = async () => {
+    if (!candidateToDelete) return;
+    setDeleting(true);
+    try {
+      const { message } = await deleteCandidate(candidateToDelete.id);
+      setCandidates((prev) => prev.filter((c) => c.id !== candidateToDelete.id));
+      SuccessToaster(message);
+      setCandidateToDelete(null);
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -125,8 +160,31 @@ export default function JobDetails({ job, initialCandidates }: JobDetailsProps) 
       </div>
 
       <div id="ranking" className="hf-anchor">
-        <CandidateRanking job={job} candidates={candidates} />
+        <CandidateRanking
+          job={job}
+          candidates={candidates}
+          onRetry={handleRetry}
+          onDelete={setCandidateToDelete}
+          busyId={retryingId}
+        />
       </div>
+
+      <ConfirmDialog
+        show={candidateToDelete !== null}
+        title="Delete this CV?"
+        message={
+          <>
+            <span className="fw-semibold text-body-emphasis">
+              {candidateToDelete?.profile?.name ?? candidateToDelete?.fileName}
+            </span>{" "}
+            and its AI evaluation will be permanently removed from this job.
+          </>
+        }
+        confirmLabel={deleting ? "Deleting…" : "Delete CV"}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setCandidateToDelete(null)}
+      />
     </>
   );
 }

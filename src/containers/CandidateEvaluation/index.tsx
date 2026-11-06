@@ -5,6 +5,8 @@ import { getScoreBand, type Candidate, type CandidateEvaluation as Evaluation, t
 import type { Job } from "@/data/jobs";
 import { formatDateTime, formatFileSize, formatYears } from "@/utils/format";
 import { calculateScore, type ScoreBreakdown } from "@/utils/scoring";
+import { candidateCvUrl } from "@/services/candidateService";
+import DeleteCandidateButton from "./components/DeleteCandidateButton";
 import RequirementTable from "./components/RequirementTable";
 
 interface CandidateEvaluationProps {
@@ -57,6 +59,9 @@ export default function CandidateEvaluation({ job, candidate }: CandidateEvaluat
   const breakdown = calculateScore(job, candidate) as ScoreBreakdown;
   const band = getScoreBand(breakdown.score);
   const verdictById = new Map(evaluation.requirements.map((r) => [r.requirementId, r.verdict]));
+  // Original CV, served by this app (/api/candidates/:id/cv) so preview and download work
+  const cvViewUrl = candidateCvUrl(candidate.id);
+  const cvDownloadUrl = candidateCvUrl(candidate.id, { download: true });
 
   return (
     <>
@@ -75,19 +80,26 @@ export default function CandidateEvaluation({ job, candidate }: CandidateEvaluat
                 <div className="min-w-0">
                   <h2 className="h4 fw-semibold text-body-emphasis mb-1">{profile.name}</h2>
                   <div className="text-secondary mb-2">{profile.currentRole}</div>
+                  {/* The AI leaves a field empty when the CV doesn't mention it */}
                   <div className="d-flex flex-wrap column-gap-3 row-gap-1 small">
-                    <a href={`mailto:${profile.email}`} className="link-secondary text-decoration-none text-break">
-                      <i className="bi bi-envelope me-1" aria-hidden="true" />
-                      {profile.email}
-                    </a>
-                    <a href={`tel:${profile.phone.replace(/\s/g, "")}`} className="link-secondary text-decoration-none">
-                      <i className="bi bi-telephone me-1" aria-hidden="true" />
-                      {profile.phone}
-                    </a>
-                    <span className="text-secondary">
-                      <i className="bi bi-geo-alt me-1" aria-hidden="true" />
-                      {profile.location}
-                    </span>
+                    {profile.email && (
+                      <a href={`mailto:${profile.email}`} className="link-secondary text-decoration-none text-break">
+                        <i className="bi bi-envelope me-1" aria-hidden="true" />
+                        {profile.email}
+                      </a>
+                    )}
+                    {profile.phone && (
+                      <a href={`tel:${profile.phone.replace(/\s/g, "")}`} className="link-secondary text-decoration-none">
+                        <i className="bi bi-telephone me-1" aria-hidden="true" />
+                        {profile.phone}
+                      </a>
+                    )}
+                    {profile.location && (
+                      <span className="text-secondary">
+                        <i className="bi bi-geo-alt me-1" aria-hidden="true" />
+                        {profile.location}
+                      </span>
+                    )}
                   </div>
                   <div className="small text-secondary mt-2">
                     Applied for <span className="fw-medium text-body-emphasis">{job.title}</span>
@@ -104,16 +116,22 @@ export default function CandidateEvaluation({ job, candidate }: CandidateEvaluat
                   <div className="mt-1">
                     <MandatoryStatus met={breakdown.mandatoryMet} total={breakdown.mandatoryTotal} />
                   </div>
+                  {candidate.rank && (
+                    <div className="small text-secondary mt-1">
+                      Ranked <span className="fw-semibold text-body-emphasis">#{candidate.rank}</span> for this job
+                    </div>
+                  )}
                 </div>
                 <div className="d-grid gap-2 flex-grow-1">
                   <a href="#cv" className="btn btn-light border">
                     <i className="bi bi-eye me-1" aria-hidden="true" />
                     View CV
                   </a>
-                  <a href={candidate.cvUrl} download={candidate.fileName} className="btn btn-primary">
+                  <a href={cvDownloadUrl} download={candidate.fileName} className="btn btn-primary">
                     <i className="bi bi-download me-1" aria-hidden="true" />
                     Download CV
                   </a>
+                  <DeleteCandidateButton candidateId={candidate.id} candidateName={profile.name} jobId={job.id} />
                 </div>
               </div>
             </div>
@@ -254,19 +272,19 @@ export default function CandidateEvaluation({ job, candidate }: CandidateEvaluat
           </div>
           <div className="d-flex gap-2">
             {candidate.fileType === "PDF" && (
-              <a href={candidate.cvUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-light border flex-grow-1">
+              <a href={cvViewUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-light border flex-grow-1">
                 <i className="bi bi-box-arrow-up-right me-1" aria-hidden="true" />
                 Open
               </a>
             )}
-            <a href={candidate.cvUrl} download={candidate.fileName} className="btn btn-sm btn-primary flex-grow-1">
+            <a href={cvDownloadUrl} download={candidate.fileName} className="btn btn-sm btn-primary flex-grow-1">
               <i className="bi bi-download me-1" aria-hidden="true" />
               Download
             </a>
           </div>
         </div>
         {candidate.fileType === "PDF" ? (
-          <iframe src={candidate.cvUrl} title={`CV of ${profile.name}`} className="w-100 border-0 hf-cv-frame rounded-bottom" />
+          <iframe src={cvViewUrl} title={`CV of ${profile.name}`} className="w-100 border-0 hf-cv-frame rounded-bottom" />
         ) : (
           <div className="card-body text-center py-5 px-3">
             <span className="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary fs-4 mb-3 hf-empty-icon">
@@ -274,7 +292,7 @@ export default function CandidateEvaluation({ job, candidate }: CandidateEvaluat
             </span>
             <h3 className="h6 fw-semibold text-body-emphasis">DOCX preview isn&apos;t available in the browser</h3>
             <p className="text-secondary mb-3">Download the file to open it in Word, or review the extracted information above.</p>
-            <a href={candidate.cvUrl} download={candidate.fileName} className="btn btn-outline-primary">
+            <a href={cvDownloadUrl} download={candidate.fileName} className="btn btn-outline-primary">
               <i className="bi bi-download me-1" aria-hidden="true" />
               Download {candidate.fileType}
             </a>

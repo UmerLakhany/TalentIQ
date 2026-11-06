@@ -1,6 +1,7 @@
 import clientApi from "@/lib/clientApi";
 import type { ApiResponse } from "@/services/authService";
 import type { Candidate, ProcessingStatus } from "@/data/candidates";
+import type { Job } from "@/data/jobs";
 
 /**
  * CV / candidate API for client components. Each function calls this app's /api/jobs/:id/...
@@ -55,6 +56,32 @@ export function uploadCvs(jobId: string, files: File[]) {
     method: "POST",
     body: form,
   });
+}
+
+/** GET /candidates/:id response: the candidate, its rank and its job (with requirements). */
+export type CandidateDetails = Candidate & { rank: number | null; job: Job };
+
+/** GET /candidates/:id — profile, AI evaluation, score, rank and the job's requirements. */
+export function getCandidate(id: string) {
+  return clientApi<ApiResponse<CandidateDetails>>(`candidates/${encodeURIComponent(id)}`);
+}
+
+/** POST /candidates/:id/retry — re-queues a failed CV for AI analysis. */
+export function retryCandidate(id: string) {
+  return clientApi<ApiResponse<Candidate>>(`candidates/${encodeURIComponent(id)}/retry`, undefined, { method: "POST" });
+}
+
+/** DELETE /candidates/:id — removes the candidate and its CV file. */
+export function deleteCandidate(id: string) {
+  return clientApi<ApiResponse<{ id: string }>>(`candidates/${encodeURIComponent(id)}`, undefined, { method: "DELETE" });
+}
+
+/**
+ * Link to the original CV through this app (/api/candidates/:id/cv), usable in <iframe> and <a>.
+ * `download: true` makes the browser save it with its original file name.
+ */
+export function candidateCvUrl(id: string, { download = false } = {}) {
+  return `/api/candidates/${encodeURIComponent(id)}/cv${download ? "?download=1" : ""}`;
 }
 
 /** GET /jobs/:id/candidates — every CV of the job with its status, score, rank and evaluation. */

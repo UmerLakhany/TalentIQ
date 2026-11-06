@@ -31,9 +31,51 @@ interface Row {
 interface CandidateRankingProps {
   job: Job;
   candidates: Candidate[];
+  /** Re-queue a failed CV (POST /candidates/:id/retry) */
+  onRetry: (candidate: Candidate) => void;
+  /** Ask to delete a CV (DELETE /candidates/:id after confirmation) */
+  onDelete: (candidate: Candidate) => void;
+  /** Candidate whose retry request is in flight (its buttons are disabled) */
+  busyId?: string | null;
 }
 
-export default function CandidateRanking({ job, candidates }: CandidateRankingProps) {
+export default function CandidateRanking({ job, candidates, onRetry, onDelete, busyId = null }: CandidateRankingProps) {
+  /** Retry (failed CVs only) + delete buttons. */
+  const rowActions = (candidate: Candidate) => {
+    const name = candidate.profile?.name ?? candidate.fileName;
+    const busy = busyId === candidate.id;
+    return (
+      <>
+        {candidate.status === "failed" && (
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-primary text-nowrap"
+            onClick={() => onRetry(candidate)}
+            disabled={busy}
+            title="Analyze this CV again"
+          >
+            {busy ? (
+              <span className="spinner-border spinner-border-sm" aria-hidden="true" />
+            ) : (
+              <i className="bi bi-arrow-clockwise" aria-hidden="true" />
+            )}
+            <span className="ms-1">Retry</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn-sm btn-outline-danger"
+          onClick={() => onDelete(candidate)}
+          disabled={busy}
+          aria-label={`Delete ${name}`}
+          title="Delete CV"
+        >
+          <i className="bi bi-trash3" aria-hidden="true" />
+        </button>
+      </>
+    );
+  };
+
   const [sortKey, setSortKey] = useState<SortKey>("score");
 
   const analyzed = candidates
@@ -184,11 +226,14 @@ export default function CandidateRanking({ job, candidates }: CandidateRankingPr
                         <div className="small text-secondary mt-1 text-nowrap">{formatDateTime(candidate.uploadedAt)}</div>
                       </td>
                       <td className="text-end">
-                        {candidate.status === "completed" ? (
-                          <Link href={`/candidates/${candidate.id}`} className="btn btn-sm btn-outline-primary text-nowrap">
-                            View
-                          </Link>
-                        ) : null}
+                        <div className="d-inline-flex gap-2">
+                          {candidate.status === "completed" && (
+                            <Link href={`/candidates/${candidate.id}`} className="btn btn-sm btn-outline-primary text-nowrap">
+                              View
+                            </Link>
+                          )}
+                          {rowActions(candidate)}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -225,6 +270,7 @@ export default function CandidateRanking({ job, candidates }: CandidateRankingPr
                       <>
                         <ProcessingStatusBadge status={candidate.status} />
                         {candidate.errorMessage && <div className="small text-danger mt-1">{candidate.errorMessage}</div>}
+                        <div className="d-flex gap-2 mt-2">{rowActions(candidate)}</div>
                       </>
                     )}
                   </div>
