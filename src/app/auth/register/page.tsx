@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import RegisterPage from "@/containers/Register";
+import RegisterPage from "@/containers/Auth/Register";
 
 export const metadata: Metadata = { title: "Create Account | HireFlow AI" };
 

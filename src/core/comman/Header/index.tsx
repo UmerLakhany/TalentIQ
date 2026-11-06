@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { route } from "@/constants/routes";
-import { clearAuthToken } from "@/lib/auth";
+import { logoutUser } from "@/services/authService";
 import { buildBreadcrumbs } from "@/utils/breadcrumbs";
 
 interface HeaderProps {
@@ -18,10 +18,16 @@ export default function Header({ onToggleSidebar, onOpenMobileSidebar }: HeaderP
   const crumbs = buildBreadcrumbs(pathname);
   const pageTitle = crumbs[crumbs.length - 1]?.label ?? "Jobs";
 
-  const logout = () => {
-    clearAuthToken();
-    // Full page load so no cached private pages remain in the client router
-    window.location.replace(route.login);
+  const logout = async () => {
+    try {
+      // The session cookie is httpOnly, so only the server can remove it
+      await logoutUser();
+    } catch {
+      // Even if the request fails, still leave the private pages
+    } finally {
+      // Full page load so no cached private pages remain in the client router
+      window.location.replace(route.login);
+    }
   };
 
   return (

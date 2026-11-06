@@ -8,13 +8,15 @@ import InputField from "@/components/Input";
 import OtpInput from "@/components/OtpInput";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
+import { ApiError } from "@/lib/clientApi";
+import { forgotPassword, verifyResetOtp } from "@/services/authService";
 import { emailRegex } from "@/utils";
 
 /**
  * Forgot password, matching the backend flow:
- *   1. Email  -> POST /recruiter/auth/forgot-password  { email }        (emails a 6-digit code)
- *   2. Code   -> POST /recruiter/auth/verify-reset-otp { email, otp }   (returns a one-time reset_token)
- *   3. Change password page (?token=reset_token) -> POST /recruiter/auth/reset-password
+ *   1. Email  -> POST /api/auth/forgot-password  { email }        (emails a 6-digit code)
+ *   2. Code   -> POST /api/auth/verify-reset-otp { email, otp }   (returns a one-time reset_token)
+ *   3. Change password page (?token=reset_token) -> POST /api/auth/reset-password
  */
 
 const OTP_LENGTH = 6;
@@ -53,17 +55,27 @@ export default function ForgotPasswordPage() {
 
   // *For Step 1: send the reset code
   const sendCode = async (email: string) => {
-    // Same shape as POST /recruiter/auth/forgot-password
     const payload = {
       email: email.trim().toLowerCase(),
     };
 
-    console.log("Forgot password payload:", payload);
-
-    // The backend gives the same answer whether or not the email is registered
-    SuccessToaster("If an account exists for this email, a reset code has been sent.");
-    setSentTo(payload.email);
-    setSecondsLeft(RESEND_COOLDOWN);
+    try {
+      // The backend gives the same answer whether or not the email is registered
+      const { message } = await forgotPassword(payload);
+      SuccessToaster(message);
+      setSentTo(payload.email);
+      setSecondsLeft(RESEND_COOLDOWN);
+    } catch (error: unknown) {
+      // A code was already sent less than a minute ago: go to the code step and show the wait time
+      if (error instanceof ApiError && error.status === 429) {
+        ErrorToaster(error.message);
+        setSentTo(payload.email);
+        const seconds = Number(/(\d+) seconds?/.exec(error.message)?.[1]);
+        setSecondsLeft(seconds > 0 ? seconds : RESEND_COOLDOWN);
+        return;
+      }
+      throw error;
+    }
   };
 
   const submitEmail = async (formData: EmailFormValues) => {
@@ -95,21 +107,18 @@ export default function ForgotPasswordPage() {
   const submitCode = async (formData: CodeFormValues) => {
     setLoading(true);
     try {
-      // Same shape as POST /recruiter/auth/verify-reset-otp
       const payload = {
         email: sentTo!,
         otp: formData.otp,
       };
 
-      console.log("Verify reset code payload:", payload);
+      // Returns a single-use reset token, valid for 15 minutes
+      const { message, data } = await verifyResetOtp(payload);
 
-      // Static for now — replace with data.reset_token returned by the verify-reset-otp API
-      const resetToken = "demo-reset-token";
-
-      SuccessToaster("Code verified. You can now set a new password.");
+      SuccessToaster(message);
 
       setTimeout(() => {
-        router.push(`${route.changePassword}?token=${encodeURIComponent(resetToken)}`);
+        router.push(`${route.changePassword}?token=${encodeURIComponent(data.reset_token)}`);
       }, 200);
     } catch (error: unknown) {
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");

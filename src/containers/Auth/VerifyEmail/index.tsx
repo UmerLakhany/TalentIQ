@@ -8,6 +8,8 @@ import InputField from "@/components/Input";
 import OtpInput from "@/components/OtpInput";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
+import { ApiError } from "@/lib/clientApi";
+import { resendOtp, verifyEmail } from "@/services/authService";
 import { emailRegex } from "@/utils";
 
 const OTP_LENGTH = 6;
@@ -22,13 +24,14 @@ type VerifyEmailFormValues = {
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Email passed from the register page (?email=...). If missing, the user types it.
+  // Email passed from the register / login page (?email=...). If missing, the user types it.
   const emailFromUrl = searchParams.get("email") ?? "";
+  // From register a code was just sent; from login (?sent=0) none was, so resend is available at once
+  const codeJustSent = Boolean(emailFromUrl) && searchParams.get("sent") !== "0";
 
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  // A code was just sent on register, so the countdown starts straight away
-  const [secondsLeft, setSecondsLeft] = useState(emailFromUrl ? RESEND_COOLDOWN : 0);
+  const [secondsLeft, setSecondsLeft] = useState(codeJustSent ? RESEND_COOLDOWN : 0);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -51,20 +54,27 @@ export default function VerifyEmailPage() {
   const submitForm = async (formData: VerifyEmailFormValues) => {
     setLoading(true);
     try {
-      // Same shape as POST /recruiter/auth/verify-email
       const payload = {
         email: formData.email.trim().toLowerCase(),
         otp: formData.otp,
       };
 
-      console.log("Verify email payload:", payload);
+      // A correct code also signs the recruiter in (session cookie set by /api/auth/verify-email)
+      const { message, data } = await verifyEmail(payload);
+      console.log("Verify email response:", data);
 
-      SuccessToaster("Email verified successfully. You can now sign in.");
+      SuccessToaster(message);
 
       setTimeout(() => {
-        router.replace(route.login);
+        router.replace(route.home);
       }, 200);
     } catch (error: unknown) {
+      // Already verified: nothing to do here, sign in instead
+      if (error instanceof ApiError && error.status === 409) {
+        ErrorToaster(error.message);
+        router.replace(route.login);
+        return;
+      }
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setLoading(false);
@@ -78,16 +88,20 @@ export default function VerifyEmailPage() {
 
     setResending(true);
     try {
-      // Same shape as POST /recruiter/auth/resend-otp
       const payload = {
         email: getValues("email").trim().toLowerCase(),
       };
 
-      console.log("Resend verification code payload:", payload);
+      const { message } = await resendOtp(payload);
 
-      SuccessToaster("A new verification code has been sent.");
+      SuccessToaster(message);
       setSecondsLeft(RESEND_COOLDOWN);
     } catch (error: unknown) {
+      // Asked too soon: the backend says how long to wait ("Please wait 42 seconds ...")
+      if (error instanceof ApiError && error.status === 429) {
+        const seconds = Number(/(\d+) seconds?/.exec(error.message)?.[1]);
+        if (seconds > 0) setSecondsLeft(seconds);
+      }
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setResending(false);

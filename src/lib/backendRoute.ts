@@ -1,0 +1,52 @@
+// Server-only helpers for the /api/* route handlers that forward requests to the TalentIQ backend.
+import { NextResponse } from "next/server";
+import { isAxiosError } from "axios";
+import serverApi from "@/lib/serverApi";
+
+/** Backend success envelope: { success: true, message, data }. */
+export interface BackendSuccess<T = unknown> {
+  success: true;
+  message: string;
+  data: T;
+}
+
+/** POSTs `body` to the backend and returns its status + JSON. Throws on network errors. */
+export async function postToBackend<T = unknown>(path: string, body?: unknown) {
+  const server = await serverApi();
+  const res = await server.post<BackendSuccess<T>>(path, body ?? {});
+  return { status: res.status, data: res.data };
+}
+
+/**
+ * Turns an error from postToBackend into a response for the browser: the backend's own error
+ * (400 validation, 401, 409, 429, ...) is passed through unchanged; a network problem becomes 503.
+ */
+export function backendErrorResponse(error: unknown) {
+  if (isAxiosError(error) && error.response) {
+    return NextResponse.json(error.response.data, { status: error.response.status });
+  }
+  return NextResponse.json(
+    { success: false, statusCode: 503, message: "Cannot reach the server. Please try again." },
+    { status: 503 }
+  );
+}
+
+/** Reads the JSON body of the incoming request ({} if empty or invalid). */
+export async function readJson(req: Request): Promise<Record<string, unknown>> {
+  try {
+    const body = await req.json();
+    return body && typeof body === "object" ? body : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Forwards a JSON POST to the backend and returns the backend's response as-is. */
+export async function forwardPost(req: Request, path: string) {
+  try {
+    const { status, data } = await postToBackend(path, await readJson(req));
+    return NextResponse.json(data, { status });
+  } catch (error) {
+    return backendErrorResponse(error);
+  }
+}

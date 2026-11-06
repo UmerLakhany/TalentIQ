@@ -4,17 +4,18 @@ import { route } from "@/constants/routes";
 import { AUTH_COOKIE } from "@/lib/auth";
 
 /**
- * Every page is protected by default.
- * - Logged out: only login and forgot password are reachable.
- * - Logged in: every page is reachable except login and forgot password.
+ * Route guard (Next.js 16 "Proxy", formerly Middleware). Every page is protected by default.
+ * - Logged out: only the /auth pages are reachable (login, register, verify email,
+ *   forgot password, change password).
+ * - Logged in: every page is reachable except the /auth pages.
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE)?.value;
   const pathname = request.nextUrl.pathname;
 
   const isAuthRoute = pathname === "/auth" || pathname.startsWith("/auth/");
 
-  // Logged-in user: hide login & forgot password
+  // Logged-in user: hide the auth pages
   if (isAuthRoute && token) {
     return NextResponse.redirect(new URL(route.home, request.url));
   }

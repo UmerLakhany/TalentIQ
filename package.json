@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.2",
+    "axios": "^1.21.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.2",
     "next": "16.4.4",
@@ -17,7 +18,8 @@
     "react-dom": "19.3.0",
     "react-hook-form": "^7.91.0",
     "react-toastify": "^11.2.0",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

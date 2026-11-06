@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import VerifyEmailPage from "@/containers/VerifyEmail";
+import VerifyEmailPage from "@/containers/Auth/VerifyEmail";
 
 export const metadata: Metadata = { title: "Verify Email | HireFlow AI" };
 

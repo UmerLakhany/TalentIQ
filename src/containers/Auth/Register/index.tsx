@@ -8,6 +8,7 @@ import InputField from "@/components/Input";
 import PasswordChecklist from "@/components/PasswordChecklist";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
+import { registerUser } from "@/services/authService";
 import { emailRegex, validatePassword } from "@/utils";
 
 type RegisterFormValues = {
@@ -38,19 +39,19 @@ export default function RegisterPage() {
   const submitForm = async (formData: RegisterFormValues) => {
     setLoading(true);
     try {
-      // Same shape as POST /recruiter/auth/register
       const payload = {
         full_name: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       };
 
-      console.log("Register payload:", payload);
+      const { message, data } = await registerUser(payload);
+      console.log("Register response:", data);
 
-      SuccessToaster("Account created. Check your email for the verification code.");
+      SuccessToaster(message);
 
       setTimeout(() => {
-        router.push(`${route.verifyEmail}?email=${encodeURIComponent(payload.email)}`);
+        router.push(`${route.verifyEmail}?email=${encodeURIComponent(data.email)}`);
       }, 200);
     } catch (error: unknown) {
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");

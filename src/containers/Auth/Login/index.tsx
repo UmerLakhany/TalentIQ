@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import InputField from "@/components/Input";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
-import { setAuthToken } from "@/lib/auth";
+import { ApiError } from "@/lib/clientApi";
+import { loginUser } from "@/services/authService";
 import { emailRegex } from "@/utils";
 
 type LoginFormValues = {
@@ -38,22 +39,28 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const payload = {
-        email: formData.email,
+        email: formData.email.trim().toLowerCase(),
         password: formData.password,
         remember_me: rememberMe,
       };
 
-      console.log("Login payload:", payload);
+      // The session token is stored in an httpOnly cookie by /api/auth/login
+      const { message, data } = await loginUser(payload);
+      console.log("Login response:", data);
 
-      // Static for now — replace with the token returned by the login API
-      setAuthToken("demo-token", rememberMe);
-
-      SuccessToaster("Logged in successfully");
+      SuccessToaster(message);
 
       setTimeout(() => {
         router.replace(route.home);
       }, 200);
     } catch (error: unknown) {
+      // Email not verified yet: go to the verify page, where a new code can be requested
+      if (error instanceof ApiError && error.status === 403 && /verify your email/i.test(error.message)) {
+        ErrorToaster(error.message);
+        const email = formData.email.trim().toLowerCase();
+        router.push(`${route.verifyEmail}?email=${encodeURIComponent(email)}&sent=0`);
+        return;
+      }
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setLoading(false);

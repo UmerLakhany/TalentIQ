@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import ChangePasswordPage from "@/containers/ChangePassword";
+import ChangePasswordPage from "@/containers/Auth/ChangePassword";
 
 export const metadata: Metadata = { title: "Change Password | HireFlow AI" };
 

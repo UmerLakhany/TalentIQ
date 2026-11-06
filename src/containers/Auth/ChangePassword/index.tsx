@@ -8,6 +8,8 @@ import InputField from "@/components/Input";
 import PasswordChecklist from "@/components/PasswordChecklist";
 import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import { route } from "@/constants/routes";
+import { ApiError } from "@/lib/clientApi";
+import { resetPassword } from "@/services/authService";
 import { validatePassword } from "@/utils";
 
 type ChangePasswordFormValues = {
@@ -25,6 +27,8 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   // Switches the page to the "password changed" view
   const [changed, setChanged] = useState(false);
+  // The backend rejected the token (expired or already used)
+  const [tokenRejected, setTokenRejected] = useState(false);
 
   const {
     register,
@@ -41,18 +45,21 @@ export default function ChangePasswordPage() {
   const submitForm = async (formData: ChangePasswordFormValues) => {
     setLoading(true);
     try {
-      // Same shape as POST /recruiter/auth/reset-password
       const payload = {
         reset_token: resetToken,
         new_password: formData.newPassword,
         confirm_password: formData.confirmPassword,
       };
 
-      console.log("Change password payload:", payload);
+      const { message } = await resetPassword(payload);
 
-      SuccessToaster("Password changed successfully");
+      SuccessToaster(message);
       setChanged(true);
     } catch (error: unknown) {
+      // The reset token expired (15 minutes) or was already used: ask for a new code
+      if (error instanceof ApiError && error.status === 400 && /reset token/i.test(error.message)) {
+        setTokenRejected(true);
+      }
       ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setLoading(false);
@@ -78,7 +85,7 @@ export default function ChangePasswordPage() {
   );
 
   // No token in the URL: the page was opened directly instead of after verifying the reset code
-  if (!resetToken) {
+  if (!resetToken || tokenRejected) {
     return (
       <div className="text-center">
         <span className="hf-empty-icon rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center fs-3 mb-4">

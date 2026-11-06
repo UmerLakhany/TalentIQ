@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import LoginPage from "@/containers/Login";
+import LoginPage from "@/containers/Auth/Login";
 
 export const metadata: Metadata = { title: "Login | HireFlow AI" };
 
