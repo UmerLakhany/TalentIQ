@@ -1,5 +1,5 @@
 # TalentIQ: full stack with one command
-#   docker compose up -d --build                      -> infrastructure + API + CV worker
+#   docker compose up -d --build                      -> infrastructure + API + CV worker + recruiter panel (http://localhost:3000)
 #   docker compose up -d postgres redis rabbitmq adminer  -> infrastructure only (run API/worker with npm locally)
 #
 # Settings and secrets (GEMINI_API_KEY, JWT_SECRET, SMTP_...) come from .env (see .env.example).
@@ -119,6 +119,28 @@ services:
       api:
         condition: service_healthy   # the API creates the database tables on startup
       rabbitmq:
+        condition: service_healthy
+
+  # Recruiter panel (Next.js). Expects the frontend repo next to this one:
+  #   TalentIQ/TalentIQ-backend   and   TalentIQ/TalentIQ-recruiter_panel
+  web:
+    build:
+      context: ${FRONTEND_DIR:-../TalentIQ-recruiter_panel}
+      args:
+        NEXT_PUBLIC_APP_URL: http://localhost:${WEB_HOST_PORT:-3000}
+    image: talentiq-recruiter-panel:latest
+    container_name: talentiq-web
+    restart: unless-stopped
+    environment:
+      # Server-side calls go to the API container, not localhost
+      NEXT_BASE_URL: http://api:4000/api/v1
+      NEXT_PUBLIC_APP_URL: http://localhost:${WEB_HOST_PORT:-3000}
+      # Plain http on localhost, so the login cookie must not be "Secure"
+      COOKIE_SECURE: "false"
+    ports:
+      - "${WEB_HOST_PORT:-3000}:3000"
+    depends_on:
+      api:
         condition: service_healthy
 
 volumes:
