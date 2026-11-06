@@ -43,10 +43,32 @@ export async function readJson(req: Request): Promise<Record<string, unknown>> {
 
 /** Forwards a JSON POST to the backend and returns the backend's response as-is. */
 export async function forwardPost(req: Request, path: string) {
+  return forwardToBackend(req, "POST", path);
+}
+
+type ForwardMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+/**
+ * Forwards a request to the backend with the session cookie as Bearer token (see serverApi) and
+ * returns the backend's response as-is. GET / DELETE pass the query string through
+ * (e.g. ?page=1&search=dev); POST / PUT / PATCH pass the JSON body.
+ */
+export async function forwardToBackend(req: Request, method: ForwardMethod, path: string) {
   try {
-    const { status, data } = await postToBackend(path, await readJson(req));
-    return NextResponse.json(data, { status });
+    const server = await serverApi();
+    const hasBody = method === "POST" || method === "PUT" || method === "PATCH";
+    const query = new URL(req.url).searchParams;
+
+    const res = await server.request<BackendSuccess>({
+      method,
+      url: path,
+      ...(hasBody ? { data: await readJson(req) } : { params: Object.fromEntries(query.entries()) }),
+    });
+    return NextResponse.json(res.data, { status: res.status });
   } catch (error) {
     return backendErrorResponse(error);
   }
 }
+
+/** Route segment `[id]` values are passed to the backend inside the path, so keep them URL-safe. */
+export const pathParam = (value: string) => encodeURIComponent(value);

@@ -1,29 +1,73 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { SuccessToaster } from "@/components/Toaster";
+import { useEffect, useState } from "react";
+import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import AnalysisProgress from "@/core/comman/AnalysisProgress";
 import PageHeader from "@/core/comman/PageHeader";
 import ConfirmDialog from "@/core/modals/ConfirmDialog";
-import { mockCandidates } from "@/data/candidates";
-import { mockJobs, type Job } from "@/data/jobs";
+import type { Job } from "@/data/jobs";
+import { deleteJob, listJobs } from "@/services/jobService";
 import { formatDate } from "@/utils/format";
-import { getJobSummary } from "@/utils/jobs";
+import { getJobSummaryFromApi } from "@/utils/jobs";
 import JobActions from "./components/JobActions";
 
-export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>(mockJobs);
-  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+/** The list shows every job on one page (newest first). */
+const PAGE_SIZE = 100;
 
-  const confirmDelete = () => {
-    if (!jobToDelete) return;
-    setJobs((prev) => prev.filter((job) => job.id !== jobToDelete.id));
-    SuccessToaster(`"${jobToDelete.title}" was deleted.`);
-    setJobToDelete(null);
+export default function JobsPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // Changing this reloads the list (used by "Try again")
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // *For Fetch Jobs (GET /jobs)
+  useEffect(() => {
+    let cancelled = false; // ignore a late reply if the page was left or reloaded meanwhile
+
+    listJobs({ limit: PAGE_SIZE, sort: "newest" })
+      .then(({ data }) => {
+        if (cancelled) return;
+        setJobs(data.jobs);
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : "Something went wrong");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const retry = () => {
+    setLoading(true);
+    setReloadKey((key) => key + 1);
   };
 
-  const rows = jobs.map((job) => ({ job, summary: getJobSummary(job, mockCandidates) }));
+  // *For Delete Job (DELETE /jobs/:id)
+  const confirmDelete = async () => {
+    if (!jobToDelete) return;
+    setDeleting(true);
+    try {
+      const { message } = await deleteJob(jobToDelete.id);
+      setJobs((prev) => prev.filter((job) => job.id !== jobToDelete.id));
+      SuccessToaster(message);
+      setJobToDelete(null);
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const rows = jobs.map((job) => ({ job, summary: getJobSummaryFromApi(job) }));
 
   return (
     <>
@@ -38,7 +82,28 @@ export default function JobsPage() {
         }
       />
 
-      {jobs.length === 0 ? (
+      {loading ? (
+        <div className="card shadow-sm">
+          <div className="card-body text-center py-5" role="status">
+            <span className="spinner-border text-primary mb-3" aria-hidden="true" />
+            <p className="text-secondary mb-0">Loading jobs…</p>
+          </div>
+        </div>
+      ) : loadError ? (
+        <div className="card shadow-sm">
+          <div className="card-body text-center py-5">
+            <span className="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger fs-4 mb-3 hf-empty-icon">
+              <i className="bi bi-exclamation-triangle" aria-hidden="true" />
+            </span>
+            <h3 className="h6 fw-semibold text-body-emphasis">Couldn&apos;t load jobs</h3>
+            <p className="text-secondary mb-3">{loadError}</p>
+            <button type="button" className="btn btn-primary" onClick={retry}>
+              <i className="bi bi-arrow-clockwise me-2" aria-hidden="true" />
+              Try again
+            </button>
+          </div>
+        </div>
+      ) : jobs.length === 0 ? (
         <div className="card shadow-sm">
           <div className="card-body text-center py-5">
             <span className="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary fs-4 mb-3 hf-empty-icon">
@@ -146,7 +211,8 @@ export default function JobsPage() {
             uploaded CVs and evaluations will be permanently removed.
           </>
         }
-        confirmLabel="Delete Job"
+        confirmLabel={deleting ? "Deleting…" : "Delete Job"}
+        loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setJobToDelete(null)}
       />

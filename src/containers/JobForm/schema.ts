@@ -10,6 +10,7 @@ export const jobFormSchema = z
     description: z.string().trim().max(500, "Keep the description under 500 characters."),
     minExperience: z
       .number({ error: "Enter the minimum years of experience." })
+      .int("Enter a whole number of years.")
       .min(0, "Experience can't be negative.")
       .max(40, "Enter a realistic number of years."),
     experienceType: weightedType,

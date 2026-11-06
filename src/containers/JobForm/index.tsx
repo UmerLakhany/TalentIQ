@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
-import { SuccessToaster } from "@/components/Toaster";
+import { ErrorToaster, SuccessToaster } from "@/components/Toaster";
 import PageHeader from "@/core/comman/PageHeader";
 import type { Job } from "@/data/jobs";
+import { createJob, updateJob } from "@/services/jobService";
 import { SCORE_WEIGHTS } from "@/utils/scoring";
 import { EMPTY_JOB_FORM, jobFormSchema, jobToFormValues, type JobFormValues } from "./schema";
 
@@ -68,18 +69,23 @@ export default function JobForm({ job, analyzedCount = 0 }: JobFormProps) {
     notRequired: allTypes.filter((t) => t === "not_required").length,
   };
 
-  const onSubmit = (data: JobFormValues) => {
-    // Static for now — will POST /jobs or PUT /jobs/:id once the API is connected
-    if (job) {
-      SuccessToaster(
-        data.reanalyze && analyzedCount > 0
-          ? `Criteria updated. ${analyzedCount} CVs queued for re-analysis.`
-          : "Criteria updated."
-      );
-      router.push(`/jobs/${job.id}`);
-    } else {
-      SuccessToaster(`Job "${data.title}" created.`);
-      router.push("/jobs");
+  const onSubmit = async ({ reanalyze, ...fields }: JobFormValues) => {
+    try {
+      if (job) {
+        // PUT /jobs/:id — the message says how many CVs were queued for re-analysis, if any
+        const { message } = await updateJob(job.id, { ...fields, reanalyze });
+        SuccessToaster(message);
+        router.push(`/jobs/${job.id}`);
+      } else {
+        // POST /jobs
+        const { message, data } = await createJob(fields);
+        SuccessToaster(message);
+        router.push(`/jobs/${data.id}`);
+      }
+      // Server-rendered job pages fetch the job again with the new criteria
+      router.refresh();
+    } catch (error: unknown) {
+      ErrorToaster(error instanceof Error ? error.message : "Something went wrong");
     }
   };
 
@@ -157,7 +163,7 @@ export default function JobForm({ job, analyzedCount = 0 }: JobFormProps) {
                   id="minExperience"
                   type="number"
                   min={0}
-                  step={0.5}
+                  step={1}
                   className={`form-control ${errors.minExperience ? "is-invalid" : ""}`}
                   {...register("minExperience", { valueAsNumber: true })}
                 />
@@ -335,8 +341,17 @@ export default function JobForm({ job, analyzedCount = 0 }: JobFormProps) {
               </div>
               <div className="d-grid gap-2">
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  <i className="bi bi-check2 me-1" aria-hidden="true" />
-                  {isEdit ? "Save Criteria" : "Create Job"}
+                  {isSubmitting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                      {isEdit ? "Saving…" : "Creating…"}
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check2 me-1" aria-hidden="true" />
+                      {isEdit ? "Save Criteria" : "Create Job"}
+                    </>
+                  )}
                 </button>
                 <Link href={cancelHref} className="btn btn-light border">
                   Cancel

@@ -8,6 +8,15 @@ export interface JobRequirement {
   type: RequirementType;
 }
 
+/** CV processing counts of a job, sent by the API with each job. */
+export interface JobCvSummary {
+  totalCvs: number;
+  analyzed: number;
+  /** Queued or processing */
+  inProgress: number;
+  failed: number;
+}
+
 export interface Job {
   id: string;
   title: string;
@@ -17,6 +26,8 @@ export interface Job {
   requirements: JobRequirement[];
   /** ISO date (YYYY-MM-DD) */
   createdAt: string;
+  /** Present on jobs returned by the API (GET /jobs, GET /jobs/:id) */
+  cvSummary?: JobCvSummary;
 }
 
 export const REQUIREMENT_TYPE_LABELS: Record<RequirementType, string> = {

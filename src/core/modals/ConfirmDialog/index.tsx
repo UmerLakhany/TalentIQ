@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "primary";
+  /** While true (e.g. waiting for the API) the buttons are disabled and the dialog can't be closed. */
+  loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,13 +23,18 @@ export default function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "danger",
+  loading = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const cancel = () => {
+    if (!loading) onCancel();
+  };
+
   useEffect(() => {
     if (!show) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
+      if (event.key === "Escape" && !loading) onCancel();
     };
     document.body.classList.add("overflow-hidden");
     document.addEventListener("keydown", onKeyDown);
@@ -35,7 +42,7 @@ export default function ConfirmDialog({
       document.body.classList.remove("overflow-hidden");
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [show, onCancel]);
+  }, [show, onCancel, loading]);
 
   if (!show) return null;
 
@@ -47,7 +54,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         tabIndex={-1}
-        onClick={onCancel}
+        onClick={cancel}
       >
         <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content border-0 rounded-4 shadow">
@@ -68,10 +75,11 @@ export default function ConfirmDialog({
             </div>
             {/* Buttons stack full-width on phones, sit side by side from 576px */}
             <div className="d-flex flex-column-reverse flex-sm-row justify-content-sm-end gap-2 px-4 pb-4">
-              <button type="button" className="btn btn-light border" onClick={onCancel}>
+              <button type="button" className="btn btn-light border" onClick={cancel} disabled={loading}>
                 {cancelLabel}
               </button>
-              <button type="button" className={`btn btn-${variant}`} onClick={onConfirm} autoFocus>
+              <button type="button" className={`btn btn-${variant}`} onClick={onConfirm} disabled={loading} autoFocus>
+                {loading && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
                 {confirmLabel}
               </button>
             </div>
