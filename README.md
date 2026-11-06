@@ -1,39 +1,191 @@
-# TalentIQ Backend
+# TalentIQ: Backend (Server, Database & AI)
 
-Express + TypeScript + Sequelize (PostgreSQL) API for the TalentIQ AI-powered CV screening system.
+TalentIQ is an AI tool that **reads CVs and ranks candidates** for a job. A recruiter creates a job with its
+requirements, uploads CVs (PDF or Word), and the AI scores how well each candidate matches.
 
-## Quick start (everything in Docker)
+This folder is the **"engine"** of the project. It contains:
 
-1. Copy `.env.example` to `.env` and set at least `JWT_SECRET` and `GEMINI_API_KEY`
-   (free key: https://aistudio.google.com/apikey). SMTP is optional: without it, emails such as the
-   verification code are printed in the API logs (`docker compose logs -f api`).
-2. Run:
-   ```sh
-   docker compose up -d --build
-   ```
-   This starts 6 services: PostgreSQL, Redis, RabbitMQ, Adminer, the **API** and the **CV worker**.
-   The worker waits until the API is healthy (the API creates the database tables on startup).
+- the **server (API)** that the website talks to,
+- the **database** that stores accounts, jobs and candidates,
+- the **AI worker** that reads each CV and scores it.
 
-| Service | URL |
+It also starts the **website** (the recruiter panel, from the `TalentIQ-recruiter_panel` folder), so
+**one command starts the whole project**.
+
+---
+
+## How to run the project (step by step)
+
+You **don't need any programming knowledge**. You only need to install one program (Docker) and copy-paste a few commands.
+
+### Step 1: Install Docker Desktop
+
+1. Download it from **https://www.docker.com/products/docker-desktop/** and install it.
+2. **Open Docker Desktop** and wait until it says it is running (a green status in the bottom-left corner).
+3. Leave Docker Desktop open while you use the project.
+
+> On Windows, Docker may ask to install or update **WSL**. Accept, and restart the computer if it asks.
+
+### Step 2: Install Git (to download the project)
+
+Download it from **https://git-scm.com/downloads** and install it with the default options.
+
+> **Don't want to install Git?** On the GitHub page, switch to each branch (`backend` and `recruiter_panel`),
+> click **Code → Download ZIP**, unzip both, and rename the folders as shown in Step 3.
+
+### Step 3: Download both parts of the project
+
+Open a terminal:
+- **Windows:** press the Start button, type **PowerShell**, and open it.
+- **Mac:** open **Terminal**.
+
+Copy and paste these commands one at a time, pressing **Enter** after each:
+
+```powershell
+mkdir TalentIQ
+cd TalentIQ
+git clone -b backend https://github.com/UmerLakhany/TalentIQ.git TalentIQ-backend
+git clone -b recruiter_panel https://github.com/UmerLakhany/TalentIQ.git TalentIQ-recruiter_panel
+```
+
+You should now have this layout. The folder names must be **exactly** these, side by side:
+
+```
+TalentIQ/
+├── TalentIQ-backend/            ← this folder
+└── TalentIQ-recruiter_panel/    ← the website
+```
+
+### Step 4: Add the settings file
+
+You received a file called **`.env`** separately (by email or chat). Put it inside the **`TalentIQ-backend`** folder.
+It contains the AI key, email settings and other configuration. **Never upload it to GitHub or share it publicly.**
+
+> **Can't see the file?** Files starting with a dot are hidden. On Windows, open File Explorer and turn on
+> **View → Show → Hidden items**. Make sure the name is exactly `.env`, not `.env.txt` or `env`.
+
+### Step 5: Start everything
+
+In the same terminal, paste:
+
+```powershell
+cd TalentIQ-backend
+docker compose up -d --build
+```
+
+- The **first time takes about 5–10 minutes**, because it downloads and builds everything. Later starts take a few seconds.
+- It is finished when you see the terminal prompt again, with lines like `Container talentiq-web Started`.
+
+This starts 7 parts: the website, the server, the AI worker, the database (PostgreSQL), a cache (Redis),
+a task queue (RabbitMQ) and a database viewer (Adminer).
+
+### Step 6: Open the website
+
+Go to **http://localhost:3000** in your browser (Chrome, Edge or Firefox).
+
+1. Click **Register** and create an account.
+2. A **6-digit code** is sent to your email. Enter it to verify your account.
+3. Create a job, upload some CVs, and wait a few seconds for the AI scores to appear.
+
+---
+
+## Everyday commands
+
+Run these inside the **`TalentIQ-backend`** folder (`cd TalentIQ-backend`).
+
+| I want to… | Command |
 |---|---|
-| API | http://localhost:4000/api/v1 (health: `/api/v1/_health`) |
-| Adminer | http://localhost:8080 (system PostgreSQL, server `postgres`, `postgres` / `postgres`, db `talentiq`) |
-| RabbitMQ UI | http://localhost:15672 (`talentiq` / `talentiq`) |
+| **Start** the project | `docker compose up -d` |
+| **Stop** the project | `docker compose down` |
+| **Check** that everything is running | `docker compose ps` |
+| **See logs or errors** | `docker compose logs -f api worker web` (press `Ctrl + C` to exit) |
+| **Delete all data** (accounts, jobs, CVs) and start fresh | `docker compose down -v` then `docker compose up -d` |
+| **Rebuild** after downloading new code | `docker compose up -d --build` |
 
-Useful commands: `docker compose ps`, `docker compose logs -f api worker`, `docker compose down`
-(data is kept in volumes; `docker compose down -v` deletes it). Uploaded CVs are stored in the `uploads`
-volume, shared by the API and the worker. Ports can be changed with `API_HOST_PORT` and `POSTGRES_HOST_PORT`.
+Stopping keeps your data. Only `down -v` deletes it, and that can't be undone.
+
+### Clear only the database (keep everything running)
+
+```powershell
+docker exec -it talentiq-postgres psql -U postgres -d talentiq -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+docker compose restart api worker
+```
+
+The server creates the empty tables again when it restarts.
+
+---
+
+## Something isn't working?
+
+| Problem | What to do |
+|---|---|
+| `docker: command not found` or "cannot connect to the Docker daemon" | Docker Desktop is not open. Open it, wait until it's running, then try again. |
+| "port is already allocated" / "address already in use" | Another program uses the same port. Close it, or add `WEB_HOST_PORT=3001` (website), `API_HOST_PORT=4001` (server) or `POSTGRES_HOST_PORT=5434` (database) to the `.env` file, and run Step 5 again. The project needs ports 3000, 4000, 5433, 6379, 5672, 8080 and 15672. |
+| The website doesn't open | Wait 1–2 minutes after starting, then refresh. Run `docker compose ps`: every line should say `running` or `healthy`. |
+| "unable to prepare context" / "path not found" during Step 5 | The folders are not named exactly `TalentIQ-backend` and `TalentIQ-recruiter_panel`, or they are not next to each other. |
+| No verification email arrives | Check your spam folder. You can also find the code in the logs: `docker compose logs api`. |
+| A CV stays at "Failed" | The file may be a scanned image, password-protected or damaged. The reason is shown next to it. Try another file. |
+| CVs stay at "Queued" | Run `docker compose logs worker` to see why. Usually the AI key (`GEMINI_API_KEY`) in `.env` is missing or has reached its limit. |
+
+---
+
+## Addresses
+
+| What | Address | Login |
+|---|---|---|
+| **Website** | http://localhost:3000 | your own account |
+| Server (API) | http://localhost:4000/api/v1 (health check: `/api/v1/_health`) | — |
+| Database viewer (Adminer) | http://localhost:8080 | System **PostgreSQL**, Server `postgres`, User `postgres`, Password `postgres`, Database `talentiq` |
+| Queue dashboard (RabbitMQ) | http://localhost:15672 | `talentiq` / `talentiq` |
+
+---
+
+# For developers
+
+Express + TypeScript + Sequelize (PostgreSQL) API, a RabbitMQ-driven CV analysis worker using Google Gemini,
+and Redis for caching and one-time codes.
+
+## How it fits together
+
+```
+Browser ─► Recruiter panel (Next.js, :3000) ─► API (Express, :4000) ─► PostgreSQL
+                                                   │    └──────────► Redis (cache, OTP codes)
+                                                   ▼
+                                       RabbitMQ queue "cv_processing"
+                                                   ▼
+                                       Worker ─► Gemini AI ─► saves score to PostgreSQL
+```
+
+Uploaded CVs are stored in the `uploads` Docker volume, shared by the API and the worker.
+
+## Settings (`.env`)
+
+The most important values:
+
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | AI key (free at https://aistudio.google.com/apikey). **Required** for CV scoring |
+| `JWT_SECRET` | Secret used to sign login tokens. **Required** |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Email account used to send verification and reset codes. If empty, emails are printed in the API logs instead |
+| `POSTGRES_HOST_PORT`, `API_HOST_PORT`, `WEB_HOST_PORT` | Ports on your computer (default 5432, 4000, 3000) |
+| `CV_MAX_FILES`, `CV_MAX_FILE_SIZE_MB` | Upload limits (default 15 files, 5 MB each) |
+| `WORKER_CONCURRENCY` | How many CVs the worker analyses at the same time |
+
+In Docker, `docker-compose.yml` overrides the database, Redis and RabbitMQ addresses so the services find each other.
 
 ## Local development (API and worker with npm)
+
+Requirements: **Node.js 22+** and Docker.
 
 1. `npm install`
 2. Start only the infrastructure: `docker compose up -d postgres redis rabbitmq adminer`
    (if PostgreSQL is installed locally on 5432, set `POSTGRES_HOST_PORT=5433` and use that port in `DB_URL`).
-3. Copy `.env.example` to `.env` and fill it in.
+3. Make sure `.env` exists in this folder, with `localhost` addresses for `DB_URL`, `REDIS_URL` and `RABBITMQ_URL`.
 4. In two terminals: `npm run dev` (API, auto-reload) and `npm run worker` (CV worker).
+5. Run the recruiter panel with `npm run dev` in `../TalentIQ-recruiter_panel` (see its README).
 
 Tables are created from the models when the API starts (`DB_SYNC_ALTER=true`).
-Don't run the Docker `api` service and `npm run dev` on the same port at the same time.
+Don't run the Docker `api` / `web` services and the `npm run dev` servers at the same time: they use the same ports.
 
 ## Scripts
 - `npm run dev` — API with ts-node + nodemon
