@@ -11,7 +11,16 @@ interface AuthCookieOptions {
   expires?: Date;
 }
 
-type ResponseWithCookies = { cookies: { set: (name: string, value: string, options?: AuthCookieOptions) => void } };
+/**
+ * Secure cookies are only sent over HTTPS. Defaults to on in production; set
+ * COOKIE_SECURE=false to run a production build over plain http (local Docker).
+ */
+function isSecureCookie(): boolean {
+  if (process.env.COOKIE_SECURE) return process.env.COOKIE_SECURE === "true";
+  return process.env.NODE_ENV === "production";
+}
+
+type ResponseWithCookies ={ cookies: { set: (name: string, value: string, options?: AuthCookieOptions) => void } };
 
 /**
  * Stores the backend access token in an httpOnly cookie (JavaScript can't read it).
@@ -20,7 +29,7 @@ type ResponseWithCookies = { cookies: { set: (name: string, value: string, optio
 export async function setAuthCookie(response: ResponseWithCookies, token: string, remember = false): Promise<void> {
   response.cookies.set(AUTH_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: remember ? REMEMBER_ME_MAX_AGE_SECONDS : undefined,
@@ -31,7 +40,7 @@ export async function setAuthCookie(response: ResponseWithCookies, token: string
 export async function clearAuthCookie(response?: ResponseWithCookies): Promise<void> {
   const options: AuthCookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     expires: new Date(0),
